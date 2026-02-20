@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Register - Police Complaint Portal</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+    <div class="auth-wrapper">
+        <div class="auth-box">
+            <div class="auth-logo">
+                <span class="logo-icon">🚔</span>
+                <h2>Create Account</h2>
+                <p>Police Complaint Portal — Citizen Registration</p>
+            </div>
+
+            <div id="alertBox"></div>
+
+            <form id="registerForm">
+                <div class="form-group">
+                    <label class="form-label">Full Name</label>
+                    <input id="name" type="text" class="form-control" placeholder="Enter your full name" required />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <input id="email" type="email" class="form-control" placeholder="your@email.com" required />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input id="password" type="password" class="form-control" placeholder="Minimum 6 characters"
+                        required />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Confirm Password</label>
+                    <input id="confirmPassword" type="password" class="form-control" placeholder="Re-enter password"
+                        required />
+                </div>
+                <button type="submit" class="btn btn-primary btn-block btn-lg" id="submitBtn">
+                    📝 Register as Citizen
+                </button>
+            </form>
+
+            <div class="auth-link">Already have an account? <a href="login.html">Login here</a></div>
+            <div class="auth-link mt-1"><a href="index.html">← Back to Home</a></div>
+        </div>
+    </div>
+
+    <script>
+        function showAlert(msg, type = 'danger') {
+            document.getElementById('alertBox').innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+        }
+
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('name').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const confirm = document.getElementById('confirmPassword').value;
+            const btn = document.getElementById('submitBtn');
+
+            if (password !== confirm) return showAlert('⚠️ Passwords do not match!');
+            if (password.length < 6) return showAlert('⚠️ Password must be at least 6 characters.');
+
+            btn.textContent = '⏳ Registering...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, email, password })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    showAlert('✅ Registration successful! Redirecting...', 'success');
+                    setTimeout(() => window.location.href = 'dashboard.html', 1200);
+                } else {
+                    showAlert('❌ ' + data.message);
+                    btn.textContent = '📝 Register as Citizen';
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                showAlert('❌ Server error. Please try again.');
+                btn.textContent = '📝 Register as Citizen';
+                btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+
+</html>

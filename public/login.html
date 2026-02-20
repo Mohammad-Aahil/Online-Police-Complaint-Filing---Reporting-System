@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login - Police Complaint Portal</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+    <div class="auth-wrapper">
+        <div class="auth-box">
+            <div class="auth-logo">
+                <span class="logo-icon">🔑</span>
+                <h2>Welcome Back</h2>
+                <p>Login to your Police Complaint Account</p>
+            </div>
+
+            <div id="alertBox"></div>
+
+            <!-- Demo credentials hint -->
+            <div class="alert alert-info" style="font-size:0.82rem;margin-bottom:1rem;">
+                🛡 <strong>Admin Demo:</strong> admin@police.gov / admin123
+            </div>
+
+            <form id="loginForm">
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <input id="email" type="email" class="form-control" placeholder="your@email.com" required />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input id="password" type="password" class="form-control" placeholder="Enter your password"
+                        required />
+                </div>
+                <button type="submit" class="btn btn-primary btn-block btn-lg" id="submitBtn">
+                    🔑 Login
+                </button>
+            </form>
+
+            <div class="auth-link">Don't have an account? <a href="register.html">Register here</a></div>
+            <div class="auth-link mt-1"><a href="index.html">← Back to Home</a></div>
+        </div>
+    </div>
+
+    <script>
+        // Redirect if already logged in
+        const token = localStorage.getItem('token');
+        const user = JSON.parse(localStorage.getItem('user') || 'null');
+        if (token && user) {
+            window.location.href = user.role === 'admin' ? 'admin-dashboard.html' : 'dashboard.html';
+        }
+
+        function showAlert(msg, type = 'danger') {
+            document.getElementById('alertBox').innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const btn = document.getElementById('submitBtn');
+
+            btn.textContent = '⏳ Logging in...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    showAlert('✅ Login successful! Redirecting...', 'success');
+                    setTimeout(() => {
+                        window.location.href = data.user.role === 'admin' ? 'admin-dashboard.html' : 'dashboard.html';
+                    }, 1000);
+                } else {
+                    showAlert('❌ ' + data.message);
+                    btn.textContent = '🔑 Login';
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                showAlert('❌ Server error. Please try again.');
+                btn.textContent = '🔑 Login';
+                btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+
+</html>

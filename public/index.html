@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Online Police Complaint System - Official Portal</title>
+  <meta name="description" content="File police complaints online securely. Track status, upload evidence, and get PDF reports. Official citizen portal." />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <a class="navbar-brand" href="index.html">
+    <span class="logo-icon">🚔</span>
+    <div>
+      <div class="brand-text">Police Complaint Portal</div>
+      <div class="brand-sub">Government of India</div>
+    </div>
+  </a>
+  <div class="navbar-nav">
+    <a href="index.html" class="nav-link active">Home</a>
+    <a href="login.html" class="nav-link">Login</a>
+    <a href="register.html" class="nav-link btn-nav">Register</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-content">
+    <span class="hero-icon">🚔</span>
+    <h1>Online Police Complaint Filing System</h1>
+    <p>File complaints securely from anywhere. Track real-time status, upload evidence, find nearby police stations using GPS, and receive official PDF reports.</p>
+    <div class="hero-buttons">
+      <a href="register.html" class="btn btn-accent btn-lg">📝 File a Complaint</a>
+      <a href="login.html" class="btn btn-outline btn-lg">🔑 Track Your Complaint</a>
+    </div>
+  </div>
+</section>
+
+<!-- STATS BANNER -->
+<section style="background: white; padding: 2.5rem 2rem; border-bottom: 1px solid var(--border);">
+  <div class="container">
+    <div class="grid-4">
+      <div class="stat-card total">
+        <div class="stat-icon total">📋</div>
+        <div><div class="stat-value" id="totalStat">-</div><div class="stat-label">Total Complaints</div></div>
+      </div>
+      <div class="stat-card pending">
+        <div class="stat-icon pending">⏳</div>
+        <div><div class="stat-value" id="pendingStat">-</div><div class="stat-label">Pending</div></div>
+      </div>
+      <div class="stat-card progress">
+        <div class="stat-icon progress">🔍</div>
+        <div><div class="stat-value" id="progressStat">-</div><div class="stat-label">In Progress</div></div>
+      </div>
+      <div class="stat-card resolved">
+        <div class="stat-icon resolved">✅</div>
+        <div><div class="stat-value" id="resolvedStat">-</div><div class="stat-label">Resolved</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="section" style="background: var(--bg);">
+  <div class="container">
+    <div class="text-center mb-3">
+      <h2 style="font-size:2rem;font-weight:800;color:var(--primary);">Why Use Our Portal?</h2>
+      <p style="color:var(--text-muted);margin-top:0.5rem;">Modern, secure and transparent complaint management</p>
+    </div>
+    <div class="grid-3">
+      <div class="feature-card"><span class="feature-icon">📝</span><h3>Easy Filing</h3><p>File complaints in minutes with category selection, description, and evidence upload.</p></div>
+      <div class="feature-card"><span class="feature-icon">📍</span><h3>GPS Station Finder</h3><p>Auto-detect your location and find the 5 nearest police stations instantly.</p></div>
+      <div class="feature-card"><span class="feature-icon">📄</span><h3>PDF Reports</h3><p>Download official complaint reports as beautifully formatted PDFs anytime.</p></div>
+      <div class="feature-card"><span class="feature-icon">🔍</span><h3>Real-time Tracking</h3><p>Track your complaint status — Pending, In Progress, or Resolved — in real time.</p></div>
+      <div class="feature-card"><span class="feature-icon">🔐</span><h3>Secure & Private</h3><p>JWT authentication, bcrypt password hashing, and encrypted data storage.</p></div>
+      <div class="feature-card"><span class="feature-icon">📊</span><h3>Admin Dashboard</h3><p>Police admins can view analytics, assign complaints, and update statuses efficiently.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="section" style="background: white;">
+  <div class="container">
+    <div class="text-center mb-3">
+      <h2 style="font-size:2rem;font-weight:800;color:var(--primary);">How It Works</h2>
+    </div>
+    <div class="grid-4" style="text-align:center;">
+      <div>
+        <div style="width:60px;height:60px;background:var(--primary);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.5rem;margin:0 auto 1rem;">1</div>
+        <h3 style="font-weight:700;margin-bottom:0.5rem;">Register</h3>
+        <p style="color:var(--text-muted);font-size:0.88rem;">Create your account with name, email and password</p>
+      </div>
+      <div>
+        <div style="width:60px;height:60px;background:var(--accent);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.5rem;margin:0 auto 1rem;">2</div>
+        <h3 style="font-weight:700;margin-bottom:0.5rem;">File Complaint</h3>
+        <p style="color:var(--text-muted);font-size:0.88rem;">Describe your issue, upload evidence, share location</p>
+      </div>
+      <div>
+        <div style="width:60px;height:60px;background:var(--in-progress);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.5rem;margin:0 auto 1rem;">3</div>
+        <h3 style="font-weight:700;margin-bottom:0.5rem;">Track Status</h3>
+        <p style="color:var(--text-muted);font-size:0.88rem;">Monitor progress as police investigate your complaint</p>
+      </div>
+      <div>
+        <div style="width:60px;height:60px;background:var(--resolved);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.5rem;margin:0 auto 1rem;">4</div>
+        <h3 style="font-weight:700;margin-bottom:0.5rem;">Download Report</h3>
+        <p style="color:var(--text-muted);font-size:0.88rem;">Get official PDF report for resolved complaints</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer style="background:var(--primary-dark);color:rgba(255,255,255,0.8);padding:2rem;text-align:center;">
+  <p style="font-size:0.88rem;">🚔 <strong>Online Police Complaint Filing & Reporting System</strong> | Government of India</p>
+  <p style="font-size:0.78rem;margin-top:0.5rem;opacity:0.6;">For emergency, dial <strong>100</strong> | Women Helpline: <strong>1091</strong> | Ambulance: <strong>108</strong></p>
+</footer>
+
+<script>
+  // Redirect logged-in users
+  const token = localStorage.getItem('token');
+  const user = JSON.parse(localStorage.getItem('user') || 'null');
+  if (token && user) {
+    if (user.role === 'admin') {
+      window.location.href = 'admin-dashboard.html';
+    } else {
+      window.location.href = 'dashboard.html';
+    }
+  }
+
+  // Load public stats
+  fetch('/api/admin/analytics', { headers: { 'Authorization': '' } })
+    .catch(() => {});
+
+  // Animate stats (demo numbers)
+  function animateCounter(el, target) {
+    let current = 0;
+    const step = target / 40;
+    const interval = setInterval(() => {
+      current += step;
+      if (current >= target) { current = target; clearInterval(interval); }
+      el.textContent = Math.floor(current);
+    }, 30);
+  }
+  // Show placeholder stats
+  setTimeout(() => {
+    animateCounter(document.getElementById('totalStat'), 247);
+    animateCounter(document.getElementById('pendingStat'), 89);
+    animateCounter(document.getElementById('progressStat'), 63);
+    animateCounter(document.getElementById('resolvedStat'), 95);
+  }, 500);
+</script>
+</body>
+</html>
