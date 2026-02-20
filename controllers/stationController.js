@@ -57,7 +57,7 @@ const getAllStations = (req, res) => {
 const getStation = (req, res) => {
     try {
         const db = getDb();
-        const station = db.prepare('SELECT * FROM police_stations WHERE id = ?').get(req.params.id);
+        const station = db.prepare('SELECT * FROM police_stations WHERE id = ?').all(req.params.id)[0];
         if (!station) return res.status(404).json({ success: false, message: 'Station not found.' });
         res.json({ success: true, station });
     } catch (err) {

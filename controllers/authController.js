@@ -18,7 +18,7 @@ const register = (req, res) => {
         }
 
         const db = getDb();
-        const existing = db.prepare('SELECT id FROM users WHERE email = ? AND is_deleted = 0').get(email.toLowerCase());
+        const existing = db.prepare('SELECT id FROM users WHERE email = ? AND is_deleted = 0').all(email.toLowerCase())[0];
         if (existing) {
             return res.status(409).json({ success: false, message: 'Email already registered.' });
         }
@@ -28,7 +28,7 @@ const register = (req, res) => {
             "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, 'citizen')"
         ).run(name.trim(), email.toLowerCase(), hashedPassword);
 
-        const user = db.prepare('SELECT id, name, email, role, created_at FROM users WHERE id = ?').get(result.lastInsertRowid);
+        const user = db.prepare('SELECT id, name, email, role, created_at FROM users WHERE id = ?').all(result.lastInsertRowid)[0];
         const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN });
 
         res.status(201).json({
@@ -53,7 +53,7 @@ const login = (req, res) => {
         }
 
         const db = getDb();
-        const user = db.prepare('SELECT * FROM users WHERE email = ? AND is_deleted = 0').get(email.toLowerCase());
+        const user = db.prepare('SELECT * FROM users WHERE email = ? AND is_deleted = 0').all(email.toLowerCase())[0];
         if (!user) {
             return res.status(401).json({ success: false, message: 'Invalid credentials.' });
         }

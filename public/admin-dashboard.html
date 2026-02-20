@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Dashboard - Police Complaint Portal</title>
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+        /* Specific Fix for the reported bug: Remarks/Descriptions going out of box */
+        .complaint-desc,
+        .remarks-text,
+        .modal-body p {
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+            word-break: break-word;
+            hyphens: auto;
+            white-space: pre-wrap;
+        }
+
+        .admin-table-container {
+            background: white;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            margin-top: 1rem;
+        }
+
+        .admin-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .admin-table th {
+            text-align: left;
+            padding: 1rem;
+            background: var(--primary);
+            color: white;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .admin-table td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.9rem;
+        }
+
+        .admin-table tr:hover {
+            background: rgba(0, 0, 0, 0.02);
+        }
+
+        .status-select {
+            padding: 0.4rem;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            font-size: 0.8rem;
+        }
+
+        .search-area {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 250px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- NAVBAR -->
+    <nav class="navbar">
+        <a class="navbar-brand" href="index.html">
+            <span class="logo-icon">🚔</span>
+            <div>
+                <div class="brand-text">Police Complaint Portal</div>
+                <div class="brand-sub">Administrator Terminal</div>
+            </div>
+        </a>
+        <div class="navbar-nav">
+            <span class="user-badge" id="userBadge">👤 Admin Loading...</span>
+            <a href="#" class="nav-link" id="logoutBtn">🚪 Logout</a>
+        </div>
+    </nav>
+
+    <div class="dashboard-layout">
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="sidebar-label">Admin Menu</div>
+            <a class="sidebar-link active" onclick="showSection('overview')">
+                <span class="icon">📊</span> Overview
+            </a>
+            <a class="sidebar-link" onclick="showSection('complaints')">
+                <span class="icon">📋</span> All Complaints
+            </a>
+            <a class="sidebar-link" onclick="showSection('stations')">
+                <span class="icon">🏢</span> Police Stations
+            </a>
+            <div class="divider" style="margin:0.5rem 0;border-color:rgba(255,255,255,0.1);"></div>
+            <div class="sidebar-label">System</div>
+            <a class="sidebar-link" onclick="logout()">
+                <span class="icon">🚪</span> Logout
+            </a>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="main-content">
+
+            <!-- OVERVIEW SECTION -->
+            <div id="section-overview">
+                <div class="d-flex justify-between align-center mb-2">
+                    <h2 style="font-size:1.4rem;font-weight:700;">System Overview</h2>
+                </div>
+
+                <!-- Stats row -->
+                <div class="grid-4 mb-3" id="statsRow">
+                    <div class="stat-card total">
+                        <div class="stat-icon total">📋</div>
+                        <div>
+                            <div class="stat-value" id="totalC">0</div>
+                            <div class="stat-label">Total Filed</div>
+                        </div>
+                    </div>
+                    <div class="stat-card pending">
+                        <div class="stat-icon pending">⏳</div>
+                        <div>
+                            <div class="stat-value" id="pendingC">0</div>
+                            <div class="stat-label">Pending Review</div>
+                        </div>
+                    </div>
+                    <div class="stat-card progress">
+                        <div class="stat-icon progress">🔍</div>
+                        <div>
+                            <div class="stat-value" id="progressC">0</div>
+                            <div class="stat-label">In Investigation</div>
+                        </div>
+                    </div>
+                    <div class="stat-card resolved">
+                        <div class="stat-icon resolved">✅</div>
+                        <div>
+                            <div class="stat-value" id="resolvedC">0</div>
+                            <div class="stat-label">Resolved</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="card">
+                        <div class="card-header">🕒 Recent Activities</div>
+                        <div class="card-body" id="recentActivities" style="padding:0;">
+                            <div class="loading-state">
+                                <div class="spinner"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">📈 Category Distribution</div>
+                        <div class="card-body" id="categoryStats">
+                            <div class="loading-state">
+                                <div class="spinner"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- COMPLAINTS SECTION -->
+            <div id="section-complaints" class="hidden">
+                <div class="d-flex justify-between align-center mb-2">
+                    <h2 style="font-size:1.4rem;font-weight:700;">Manage Complaints</h2>
+                </div>
+
+                <!-- Filter bar -->
+                <div class="filter-bar">
+                    <select id="filterStatus" onchange="loadAllComplaints()">
+                        <option value="">All Statuses</option>
+                        <option value="Pending">Pending</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Resolved">Resolved</option>
+                    </select>
+                    <select id="filterCategory" onchange="loadAllComplaints()">
+                        <option value="">All Categories</option>
+                        <option value="Theft">Theft</option>
+                        <option value="Cybercrime">Cybercrime</option>
+                        <option value="Harassment">Harassment</option>
+                        <option value="Fraud">Fraud</option>
+                        <option value="Missing Person">Missing Person</option>
+                        <option value="Assault">Assault</option>
+                        <option value="Other">Other</option>
+                    </select>
+                    <span style="color:var(--text-muted);font-size:0.88rem;" id="adminComplaintCount"></span>
+                </div>
+
+                <div id="adminComplaintsList">
+                    <div class="loading-state">
+                        <div class="spinner"></div>
+                        <p>Fetching all records...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STATIONS SECTION (Placeholder for now) -->
+            <div id="section-stations" class="hidden">
+                <h2 class="mb-2">🏢 Police Stations Management</h2>
+                <div class="alert alert-info">Station management module is under construction.</div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- UPDATE STATUS MODAL -->
+    <div class="modal-overlay hidden" id="statusModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>📝 Update Complaint Status</h3>
+                <button class="modal-close" onclick="closeModal('statusModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="updateStatusForm">
+                    <input type="hidden" id="updateId">
+                    <div class="form-group">
+                        <label class="form-label">New Status</label>
+                        <select id="newStatus" class="form-control" required>
+                            <option value="Pending">Pending</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Resolved">Resolved</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Admin Remarks (Visible to Citizen)</label>
+                        <textarea id="adminRemarks" class="form-control"
+                            placeholder="Add details about the update or investigation progress..." required></textarea>
+                    </div>
+                    <div id="modalAlert"></div>
+                    <button type="submit" class="btn btn-primary btn-block" id="saveStatusBtn">💾 Save Changes</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- DETAIL MODAL (Enhanced for Admin) -->
+    <div class="modal-overlay hidden" id="detailModal">
+        <div class="modal" style="max-width:700px;">
+            <div class="modal-header">
+                <h3>📋 Case Details</h3>
+                <button class="modal-close" onclick="closeModal('detailModal')">✕</button>
+            </div>
+            <div class="modal-body" id="detailModalBody"></div>
+            <div class="modal-footer">
+                <button class="btn btn-accent" id="updateBtnInModal">📝 Update Status</button>
+                <button class="btn btn-primary" id="downloadBtn" onclick="downloadPDF()">⬇ Download PDF</button>
+                <button class="btn btn-outline" style="color:var(--text);border-color:var(--border);"
+                    onclick="closeModal('detailModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = '/api';
+        let currentComplaintId = null;
+        let currentPage = 1;
+
+        function getToken() { return localStorage.getItem('token'); }
+        function getUser() { return JSON.parse(localStorage.getItem('user') || 'null'); }
+        function authHeader() { return { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' }; }
+
+        // Guard
+        const user = getUser();
+        const token = getToken();
+        if (!token || !user || user.role !== 'admin') {
+            window.location.href = 'login.html';
+        }
+        document.getElementById('userBadge').textContent = '🛡 Admin: ' + user.name;
+        document.getElementById('logoutBtn').onclick = logout;
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = 'login.html';
+        }
+
+        function showSection(name) {
+            document.querySelectorAll('[id^="section-"]').forEach(s => s.classList.add('hidden'));
+            document.getElementById('section-' + name).classList.remove('hidden');
+            document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+
+            if (name === 'complaints') loadAllComplaints();
+            if (name === 'overview') loadAnalytics();
+        }
+
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        function getBadgeClass(status) {
+            return status === 'Pending' ? 'badge-pending' : status === 'In Progress' ? 'badge-progress' : 'badge-resolved';
+        }
+
+        async function loadAnalytics() {
+            try {
+                const res = await fetch(`${API}/admin/analytics`, { headers: authHeader() });
+                const data = await res.json();
+                if (!data.success) return;
+
+                const { total, pending, inProgress, resolved, byCategory, recentComplaints } = data.analytics;
+
+                document.getElementById('totalC').textContent = total;
+                document.getElementById('pendingC').textContent = pending;
+                document.getElementById('progressC').textContent = inProgress;
+                document.getElementById('resolvedC').textContent = resolved;
+
+                // Categories
+                let catHtml = '<table class="admin-table"><thead><tr><th>Category</th><th>Count</th></tr></thead><tbody>';
+                byCategory.forEach(cat => {
+                    catHtml += `<tr><td>${cat.category}</td><td><strong>${cat.count}</strong></td></tr>`;
+                });
+                catHtml += '</tbody></table>';
+                document.getElementById('categoryStats').innerHTML = catHtml;
+
+                // Recent Activities
+                let recHtml = '<div class="timeline" style="padding: 1.5rem;">';
+                recentComplaints.forEach(c => {
+                    recHtml += `
+                        <div class="timeline-item">
+                            <div class="timeline-date">${new Date(c.created_at).toLocaleString()}</div>
+                            <div class="timeline-content">
+                                <strong>${c.citizen_name}</strong> filed <strong>${c.category}</strong>
+                                <p class="remarks-text">${c.description.substring(0, 100)}${c.description.length > 100 ? '...' : ''}</p>
+                                <span class="badge ${getBadgeClass(c.status)}" style="font-size:0.7rem;margin-top:0.3rem;">${c.status}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+                recHtml += '</div>';
+                document.getElementById('recentActivities').innerHTML = recHtml;
+
+            } catch (err) { console.error('Analytics load error:', err); }
+        }
+
+        async function loadAllComplaints() {
+            const status = document.getElementById('filterStatus').value;
+            const category = document.getElementById('filterCategory').value;
+            const url = `${API}/admin/complaints?status=${status}&category=${category}&page=${currentPage}&limit=10`;
+
+            try {
+                const res = await fetch(url, { headers: authHeader() });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.message);
+
+                const { complaints, pagination } = data;
+                document.getElementById('adminComplaintCount').textContent = `${pagination.total} records found`;
+
+                let html = `
+                    <div class="admin-table-container">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Ref</th>
+                                    <th>Citizen</th>
+                                    <th>Category</th>
+                                    <th>Date</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+
+                complaints.forEach(c => {
+                    html += `
+                        <tr>
+                            <td style="font-family:monospace;font-size:0.8rem;">${c.reference_number}</td>
+                            <td>
+                                <div style="font-weight:600;">${c.citizen_name}</div>
+                                <div style="font-size:0.75rem;color:var(--text-muted);">${c.citizen_email}</div>
+                            </td>
+                            <td>${c.category}</td>
+                            <td style="font-size:0.8rem;">${new Date(c.created_at).toLocaleDateString()}</td>
+                            <td><span class="badge ${getBadgeClass(c.status)}">${c.status}</span></td>
+                            <td>
+                                <div class="d-flex gap-1">
+                                    <button class="btn btn-primary btn-sm" onclick="viewComplaint(${c.id})">👁</button>
+                                    <button class="btn btn-accent btn-sm" onclick="openStatusModal(${c.id}, '${c.status}')">✏</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                html += '</tbody></table></div>';
+
+                // Pagination
+                if (pagination.pages > 1) {
+                    html += '<div class="pagination">';
+                    for (let i = 1; i <= pagination.pages; i++) {
+                        html += `<button class="page-btn ${i === currentPage ? 'active' : ''}" onclick="changePage(${i})">${i}</button>`;
+                    }
+                    html += '</div>';
+                }
+
+                document.getElementById('adminComplaintsList').innerHTML = html;
+            } catch (err) {
+                document.getElementById('adminComplaintsList').innerHTML = `<div class="alert alert-danger">❌ ${err.message}</div>`;
+            }
+        }
+
+        function changePage(p) { currentPage = p; loadAllComplaints(); }
+
+        async function viewComplaint(id) {
+            currentComplaintId = id;
+            document.getElementById('detailModalBody').innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+            document.getElementById('detailModal').classList.remove('hidden');
+
+            try {
+                const res = await fetch(`${API}/admin/complaints/${id}`, { headers: authHeader() });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.message);
+                const c = data.complaint;
+                const history = data.history || [];
+
+                document.getElementById('updateBtnInModal').onclick = () => {
+                    closeModal('detailModal');
+                    openStatusModal(c.id, c.status);
+                };
+
+                document.getElementById('detailModalBody').innerHTML = `
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem;">
+                        <div>
+                            <h4 class="mb-1" style="color:var(--primary);">Citizen Information</h4>
+                            <p><strong>Name:</strong> ${c.citizen_name}</p>
+                            <p><strong>Email:</strong> ${c.citizen_email}</p>
+                        </div>
+                        <div>
+                            <h4 class="mb-1" style="color:var(--primary);">Incident Info</h4>
+                            <p><strong>Ref:</strong> <span style="font-family:monospace;">${c.reference_number}</span></p>
+                            <p><strong>Category:</strong> ${c.category}</p>
+                            <p><strong>Date Filed:</strong> ${new Date(c.created_at).toLocaleString()}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-2">
+                        <h4 class="mb-1" style="color:var(--primary);">Description</h4>
+                        <div style="background:var(--bg);padding:1rem;border-radius:var(--radius-sm);line-height:1.5;">
+                            <p class="complaint-desc">${c.description}</p>
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <h4 class="mb-1" style="color:var(--primary);">Location</h4>
+                        <p>📍 ${c.address_text}</p>
+                    </div>
+
+                    <div class="mb-2">
+                        <h4 class="mb-1" style="color:var(--primary);">Assigned Station</h4>
+                        <p>🏢 ${c.station_name || 'Unassigned'}</p>
+                    </div>
+
+                    <div class="divider"></div>
+
+                    <h4 class="mb-2" style="color:var(--primary);">📜 Case History & Remarks</h4>
+                    <div class="timeline">
+                        ${history.length > 0 ? history.map(h => `
+                            <div class="timeline-item">
+                                <div class="timeline-date">${new Date(h.created_at).toLocaleString()}</div>
+                                <div class="timeline-content">
+                                    <div class="d-flex justify-between">
+                                        <strong>${h.changed_by_name}</strong>
+                                        <span class="badge ${getBadgeClass(h.new_status)}">${h.new_status}</span>
+                                    </div>
+                                    <p class="remarks-text mt-1" style="font-style:italic;">"${h.remarks || 'No remarks provided'}"</p>
+                                </div>
+                            </div>
+                        `).join('') : '<p class="text-muted">No history found for this case.</p>'}
+                    </div>
+                `;
+            } catch (err) {
+                document.getElementById('detailModalBody').innerHTML = `<div class="alert alert-danger">❌ ${err.message}</div>`;
+            }
+        }
+
+        function openStatusModal(id, currentStatus) {
+            document.getElementById('updateId').value = id;
+            document.getElementById('newStatus').value = currentStatus;
+            document.getElementById('adminRemarks').value = '';
+            document.getElementById('modalAlert').innerHTML = '';
+            document.getElementById('statusModal').classList.remove('hidden');
+        }
+
+        document.getElementById('updateStatusForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('updateId').value;
+            const status = document.getElementById('newStatus').value;
+            const remarks = document.getElementById('adminRemarks').value.trim();
+            const btn = document.getElementById('saveStatusBtn');
+
+            btn.disabled = true;
+            btn.textContent = '⏳ Updating...';
+
+            try {
+                const res = await fetch(`${API}/admin/complaints/${id}/status`, {
+                    method: 'PUT',
+                    headers: authHeader(),
+                    body: JSON.stringify({ status, remarks })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    document.getElementById('modalAlert').innerHTML = '<div class="alert alert-success">✅ Status updated successfully!</div>';
+                    setTimeout(() => {
+                        closeModal('statusModal');
+                        loadAllComplaints();
+                        loadAnalytics();
+                        btn.disabled = false;
+                        btn.textContent = '💾 Save Changes';
+                    }, 1000);
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (err) {
+                document.getElementById('modalAlert').innerHTML = `<div class="alert alert-danger">❌ ${err.message}</div>`;
+                btn.disabled = false;
+                btn.textContent = '💾 Save Changes';
+            }
+        });
+
+        function downloadPDF() {
+            if (!currentComplaintId) return;
+            const link = document.createElement('a');
+            fetch(`${API}/admin/complaints/${currentComplaintId}/download`, { headers: { 'Authorization': 'Bearer ' + getToken() } })
+                .then(res => res.blob())
+                .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    link.href = url;
+                    link.download = `complaint-${currentComplaintId}.pdf`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                });
+        }
+
+        // Init
+        loadAnalytics();
+    </script>
+</body>
+
+</html>

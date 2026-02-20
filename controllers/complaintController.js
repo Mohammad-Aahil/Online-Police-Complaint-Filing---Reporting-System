@@ -34,8 +34,8 @@ const fileComplaint = async (req, res) => {
     `).run(reference_number, citizen_id, category, description, address_text, latitude || null, longitude || null, evidence_file);
 
         const complaintId = result.lastInsertRowid;
-        const complaint = db.prepare('SELECT * FROM complaints WHERE id = ?').get(complaintId);
-        const citizen = db.prepare('SELECT name, email FROM users WHERE id = ?').get(citizen_id);
+        const complaint = db.prepare('SELECT * FROM complaints WHERE id = ?').all(complaintId)[0];
+        const citizen = db.prepare('SELECT name, email FROM users WHERE id = ?').all(citizen_id)[0];
 
         // Generate PDF
         const { filename } = await generateComplaintPDF(complaint, citizen, null);
@@ -45,7 +45,7 @@ const fileComplaint = async (req, res) => {
         db.prepare(`INSERT INTO complaint_history (complaint_id, changed_by, old_status, new_status, remarks) VALUES (?, ?, ?, ?, ?)`)
             .run(complaintId, citizen_id, null, 'Pending', 'Complaint filed');
 
-        const finalComplaint = db.prepare('SELECT * FROM complaints WHERE id = ?').get(complaintId);
+        const finalComplaint = db.prepare('SELECT * FROM complaints WHERE id = ?').all(complaintId)[0];
 
         res.status(201).json({
             success: true,
@@ -80,7 +80,7 @@ const getMyComplaints = (req, res) => {
         params.push(limit, offset);
 
         const complaints = db.prepare(query).all(...params);
-        const totalRow = db.prepare(`SELECT COUNT(*) as count FROM complaints WHERE citizen_id = ? AND is_deleted = 0 ${status ? 'AND status = ?' : ''}`).get(...(status ? [req.user.id, status] : [req.user.id]));
+        const totalRow = db.prepare(`SELECT COUNT(*) as count FROM complaints WHERE citizen_id = ? AND is_deleted = 0 ${status ? 'AND status = ?' : ''}`).all(...(status ? [req.user.id, status] : [req.user.id]))[0];
 
         res.json({
             success: true,
@@ -104,7 +104,7 @@ const getComplaint = (req, res) => {
       JOIN users u ON c.citizen_id = u.id
       LEFT JOIN police_stations ps ON c.assigned_station_id = ps.id
       WHERE c.id = ? AND c.is_deleted = 0
-    `).get(req.params.id);
+    `).all(req.params.id)[0];
 
         if (!complaint) {
             return res.status(404).json({ success: false, message: 'Complaint not found.' });
@@ -157,10 +157,10 @@ const updateComplaint = async (req, res) => {
     `).run(category || complaint.category, description || complaint.description, address_text || complaint.address_text,
             latitude || complaint.latitude, longitude || complaint.longitude, evidence_file, complaint.id);
 
-        const updatedComplaint = db.prepare('SELECT * FROM complaints WHERE id = ?').get(complaint.id);
-        const citizen = db.prepare('SELECT name, email FROM users WHERE id = ?').get(req.user.id);
+        const updatedComplaint = db.prepare('SELECT * FROM complaints WHERE id = ?').all(complaint.id)[0];
+        const citizen = db.prepare('SELECT name, email FROM users WHERE id = ?').all(req.user.id)[0];
         const station = updatedComplaint.assigned_station_id
-            ? db.prepare('SELECT * FROM police_stations WHERE id = ?').get(updatedComplaint.assigned_station_id)
+            ? db.prepare('SELECT * FROM police_stations WHERE id = ?').all(updatedComplaint.assigned_station_id)[0]
             : null;
 
         // Delete old PDF and regenerate
@@ -171,7 +171,7 @@ const updateComplaint = async (req, res) => {
         db.prepare('INSERT INTO complaint_history (complaint_id, changed_by, old_status, new_status, remarks) VALUES (?, ?, ?, ?, ?)')
             .run(complaint.id, req.user.id, complaint.status, complaint.status, 'Complaint details updated by citizen');
 
-        res.json({ success: true, message: 'Complaint updated successfully!', complaint: db.prepare('SELECT * FROM complaints WHERE id = ?').get(complaint.id) });
+        res.json({ success: true, message: 'Complaint updated successfully!', complaint: db.prepare('SELECT * FROM complaints WHERE id = ?').all(complaint.id)[0] });
     } catch (err) {
         console.error('Update complaint error:', err);
         res.status(500).json({ success: false, message: 'Server error while updating.' });

@@ -30,7 +30,7 @@ const getAllComplaints = (req, res) => {
         const countParams = [];
         if (status) { countQuery += ' AND c.status = ?'; countParams.push(status); }
         if (category) { countQuery += ' AND c.category = ?'; countParams.push(category); }
-        const total = db.prepare(countQuery).get(...countParams);
+        const total = db.prepare(countQuery).all(...countParams)[0];
 
         res.json({
             success: true,
@@ -63,17 +63,17 @@ const updateComplaintStatus = async (req, res) => {
             .run(complaint.id, req.user.id, oldStatus, status, remarks || `Status updated by admin`);
 
         // Regenerate PDF with new status
-        const updatedComplaint = db.prepare('SELECT * FROM complaints WHERE id = ?').get(complaint.id);
-        const citizen = db.prepare('SELECT name, email FROM users WHERE id = ?').get(complaint.citizen_id);
+        const updatedComplaint = db.prepare('SELECT * FROM complaints WHERE id = ?').all(complaint.id)[0];
+        const citizen = db.prepare('SELECT name, email FROM users WHERE id = ?').all(complaint.citizen_id)[0];
         const station = updatedComplaint.assigned_station_id
-            ? db.prepare('SELECT * FROM police_stations WHERE id = ?').get(updatedComplaint.assigned_station_id)
+            ? db.prepare('SELECT * FROM police_stations WHERE id = ?').all(updatedComplaint.assigned_station_id)[0]
             : null;
 
         deleteOldPDF(complaint.pdf_file);
         const { filename } = await generateComplaintPDF(updatedComplaint, citizen, station);
         db.prepare('UPDATE complaints SET pdf_file = ? WHERE id = ?').run(filename, complaint.id);
 
-        res.json({ success: true, message: `Complaint status updated to ${status}`, complaint: db.prepare('SELECT * FROM complaints WHERE id = ?').get(complaint.id) });
+        res.json({ success: true, message: `Complaint status updated to ${status}`, complaint: db.prepare('SELECT * FROM complaints WHERE id = ?').all(complaint.id)[0] });
     } catch (err) {
         console.error('Update status error:', err);
         res.status(500).json({ success: false, message: 'Server error.' });
@@ -87,10 +87,10 @@ const assignComplaint = (req, res) => {
         if (!station_id) return res.status(400).json({ success: false, message: 'station_id is required.' });
 
         const db = getDb();
-        const complaint = db.prepare('SELECT * FROM complaints WHERE id = ? AND is_deleted = 0').get(req.params.id);
+        const complaint = db.prepare('SELECT * FROM complaints WHERE id = ? AND is_deleted = 0').all(req.params.id)[0];
         if (!complaint) return res.status(404).json({ success: false, message: 'Complaint not found.' });
 
-        const station = db.prepare('SELECT * FROM police_stations WHERE id = ?').get(station_id);
+        const station = db.prepare('SELECT * FROM police_stations WHERE id = ?').all(station_id)[0];
         if (!station) return res.status(404).json({ success: false, message: 'Station not found.' });
 
         db.prepare('UPDATE complaints SET assigned_station_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(station_id, complaint.id);
@@ -108,7 +108,7 @@ const assignComplaint = (req, res) => {
 const downloadComplaint = (req, res) => {
     try {
         const db = getDb();
-        const complaint = db.prepare('SELECT * FROM complaints WHERE id = ? AND is_deleted = 0').get(req.params.id);
+        const complaint = db.prepare('SELECT * FROM complaints WHERE id = ? AND is_deleted = 0').all(req.params.id)[0];
         if (!complaint) return res.status(404).json({ success: false, message: 'Complaint not found.' });
         if (!complaint.pdf_file) return res.status(404).json({ success: false, message: 'PDF not generated.' });
 
@@ -124,16 +124,16 @@ const downloadComplaint = (req, res) => {
 const getAnalytics = (req, res) => {
     try {
         const db = getDb();
-        const total = db.prepare('SELECT COUNT(*) as count FROM complaints WHERE is_deleted = 0').get().count;
-        const pending = db.prepare("SELECT COUNT(*) as count FROM complaints WHERE status = 'Pending' AND is_deleted = 0").get().count;
-        const inProgress = db.prepare("SELECT COUNT(*) as count FROM complaints WHERE status = 'In Progress' AND is_deleted = 0").get().count;
-        const resolved = db.prepare("SELECT COUNT(*) as count FROM complaints WHERE status = 'Resolved' AND is_deleted = 0").get().count;
+        const total = db.prepare('SELECT COUNT(*) as count FROM complaints WHERE is_deleted = 0').all()[0].count;
+        const pending = db.prepare("SELECT COUNT(*) as count FROM complaints WHERE status = 'Pending' AND is_deleted = 0").all()[0].count;
+        const inProgress = db.prepare("SELECT COUNT(*) as count FROM complaints WHERE status = 'In Progress' AND is_deleted = 0").all()[0].count;
+        const resolved = db.prepare("SELECT COUNT(*) as count FROM complaints WHERE status = 'Resolved' AND is_deleted = 0").all()[0].count;
         const byCategory = db.prepare("SELECT category, COUNT(*) as count FROM complaints WHERE is_deleted = 0 GROUP BY category ORDER BY count DESC").all();
         const recentComplaints = db.prepare(`
       SELECT c.*, u.name as citizen_name FROM complaints c JOIN users u ON c.citizen_id = u.id
       WHERE c.is_deleted = 0 ORDER BY c.created_at DESC LIMIT 5
     `).all();
-        const totalUsers = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'citizen' AND is_deleted = 0").get().count;
+        const totalUsers = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'citizen' AND is_deleted = 0").all()[0].count;
 
         res.json({
             success: true,
@@ -155,7 +155,7 @@ const getComplaint = (req, res) => {
       FROM complaints c JOIN users u ON c.citizen_id = u.id
       LEFT JOIN police_stations ps ON c.assigned_station_id = ps.id
       WHERE c.id = ? AND c.is_deleted = 0
-    `).get(req.params.id);
+    `).all(req.params.id)[0];
         if (!complaint) return res.status(404).json({ success: false, message: 'Complaint not found.' });
 
         const history = db.prepare(`
