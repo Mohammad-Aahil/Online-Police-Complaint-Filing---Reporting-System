@@ -204,40 +204,50 @@
                 </div>
             </div>
 
-            <!-- STATIONS SECTION (Placeholder for now) -->
+            <!-- STATIONS SECTION -->
             <div id="section-stations" class="hidden">
-                <h2 class="mb-2">🏢 Police Stations Management</h2>
-                <div class="alert alert-info">Station management module is under construction.</div>
+                <div class="d-flex justify-between align-center mb-2">
+                    <h2 style="font-size:1.4rem;font-weight:700;">Police Stations Management</h2>
+                </div>
+                <div class="admin-table-container">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Station Name</th>
+                                <th>Address</th>
+                                <th>Contact</th>
+                                <th>Coordinates</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stationsTableBody">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
         </main>
     </div>
 
-    <!-- UPDATE STATUS MODAL -->
-    <div class="modal-overlay hidden" id="statusModal">
+    <!-- ASSIGN STATION MODAL -->
+    <div class="modal-overlay hidden" id="assignModal">
         <div class="modal">
             <div class="modal-header">
-                <h3>📝 Update Complaint Status</h3>
-                <button class="modal-close" onclick="closeModal('statusModal')">✕</button>
+                <h3>🏢 Assign Police Station</h3>
+                <button class="modal-close" onclick="closeModal('assignModal')">✕</button>
             </div>
             <div class="modal-body">
-                <form id="updateStatusForm">
-                    <input type="hidden" id="updateId">
+                <form id="assignStationForm">
+                    <input type="hidden" id="assignComplaintId">
                     <div class="form-group">
-                        <label class="form-label">New Status</label>
-                        <select id="newStatus" class="form-control" required>
-                            <option value="Pending">Pending</option>
-                            <option value="In Progress">In Progress</option>
-                            <option value="Resolved">Resolved</option>
+                        <label class="form-label">Select Station</label>
+                        <select id="stationSelect" class="form-control" required>
+                            <option value="">-- Choose a Station --</option>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Admin Remarks (Visible to Citizen)</label>
-                        <textarea id="adminRemarks" class="form-control"
-                            placeholder="Add details about the update or investigation progress..." required></textarea>
-                    </div>
-                    <div id="modalAlert"></div>
-                    <button type="submit" class="btn btn-primary btn-block" id="saveStatusBtn">💾 Save Changes</button>
+                    <div id="assignAlert"></div>
+                    <button type="submit" class="btn btn-primary btn-block" id="saveAssignBtn">✅ Confirm
+                        Assignment</button>
                 </form>
             </div>
         </div>
@@ -252,8 +262,9 @@
             </div>
             <div class="modal-body" id="detailModalBody"></div>
             <div class="modal-footer">
+                <button class="btn btn-primary" id="assignBtnInModal">🏢 Assign Station</button>
                 <button class="btn btn-accent" id="updateBtnInModal">📝 Update Status</button>
-                <button class="btn btn-primary" id="downloadBtn" onclick="downloadPDF()">⬇ Download PDF</button>
+                <button class="btn btn-secondary" id="downloadBtn" onclick="downloadPDF()">⬇ PDF</button>
                 <button class="btn btn-outline" style="color:var(--text);border-color:var(--border);"
                     onclick="closeModal('detailModal')">Close</button>
             </div>
@@ -288,10 +299,13 @@
             document.querySelectorAll('[id^="section-"]').forEach(s => s.classList.add('hidden'));
             document.getElementById('section-' + name).classList.remove('hidden');
             document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
-            event.currentTarget.classList.add('active');
+            if (event && event.currentTarget) event.currentTarget.classList.add('active');
+
+            currentPage = 1;
 
             if (name === 'complaints') loadAllComplaints();
             if (name === 'overview') loadAnalytics();
+            if (name === 'stations') loadStationsData();
         }
 
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
@@ -383,8 +397,9 @@
                             <td><span class="badge ${getBadgeClass(c.status)}">${c.status}</span></td>
                             <td>
                                 <div class="d-flex gap-1">
-                                    <button class="btn btn-primary btn-sm" onclick="viewComplaint(${c.id})">👁</button>
-                                    <button class="btn btn-accent btn-sm" onclick="openStatusModal(${c.id}, '${c.status}')">✏</button>
+                                    <button class="btn btn-primary btn-sm" title="View Details" onclick="viewComplaint(${c.id})">👁</button>
+                                    <button class="btn btn-accent btn-sm" title="Update Status" onclick="openStatusModal(${c.id}, '${c.status}')">✏</button>
+                                    <button class="btn btn-secondary btn-sm" title="Assign Station" onclick="openAssignModal(${c.id}, ${c.assigned_station_id || 'null'})">🏢</button>
                                 </div>
                             </td>
                         </tr>
@@ -426,6 +441,11 @@
                     closeModal('detailModal');
                     openStatusModal(c.id, c.status);
                 };
+
+                document.getElementById('assignBtnInModal').onclick = () => {
+                    closeModal('detailModal');
+                    openAssignModal(c.id, c.assigned_station_id);
+                }
 
                 document.getElementById('detailModalBody').innerHTML = `
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem;">
@@ -524,6 +544,82 @@
                 document.getElementById('modalAlert').innerHTML = `<div class="alert alert-danger">❌ ${err.message}</div>`;
                 btn.disabled = false;
                 btn.textContent = '💾 Save Changes';
+            }
+        });
+
+        async function loadStationsData() {
+            try {
+                const res = await fetch(`${API}/stations`, { headers: authHeader() });
+                const data = await res.json();
+                if (!data.success) return;
+
+                let html = '';
+                data.stations.forEach(s => {
+                    html += `
+                        <tr>
+                            <td><strong>${s.name}</strong></td>
+                            <td>${s.address}</td>
+                            <td>${s.contact || 'N/A'}</td>
+                            <td style="font-family:monospace;font-size:0.8rem;">${s.latitude}, ${s.longitude}</td>
+                        </tr>
+                    `;
+                });
+                document.getElementById('stationsTableBody').innerHTML = html;
+            } catch (err) { console.error('Stations load error:', err); }
+        }
+
+        async function openAssignModal(id, currentStationId) {
+            document.getElementById('assignComplaintId').value = id;
+            document.getElementById('assignAlert').innerHTML = '';
+            document.getElementById('assignModal').classList.remove('hidden');
+
+            try {
+                const res = await fetch(`${API}/stations`, { headers: authHeader() });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.message);
+
+                let options = '<option value="">-- Choose a Station --</option>';
+                data.stations.forEach(s => {
+                    options += `<option value="${s.id}" ${s.id == currentStationId ? 'selected' : ''}>${s.name}</option>`;
+                });
+                document.getElementById('stationSelect').innerHTML = options;
+            } catch (err) {
+                document.getElementById('assignAlert').innerHTML = `<div class="alert alert-danger">❌ ${err.message}</div>`;
+            }
+        }
+
+        document.getElementById('assignStationForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('assignComplaintId').value;
+            const station_id = document.getElementById('stationSelect').value;
+            const btn = document.getElementById('saveAssignBtn');
+
+            if (!station_id) return;
+            btn.disabled = true;
+            btn.textContent = '⏳ Assigning...';
+
+            try {
+                const res = await fetch(`${API}/admin/complaints/${id}/assign`, {
+                    method: 'PUT',
+                    headers: authHeader(),
+                    body: JSON.stringify({ station_id })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    document.getElementById('assignAlert').innerHTML = '<div class="alert alert-success">✅ Assigned successfully!</div>';
+                    setTimeout(() => {
+                        closeModal('assignModal');
+                        loadAllComplaints();
+                    }, 1000);
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (err) {
+                document.getElementById('assignAlert').innerHTML = `<div class="alert alert-danger">❌ ${err.message}</div>`;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '✅ Confirm Assignment';
             }
         });
 

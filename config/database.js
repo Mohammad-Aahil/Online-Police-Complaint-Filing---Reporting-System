@@ -81,7 +81,8 @@ function initializeDatabase() {
 
   // Seed police stations if empty
   const stationCount = database.prepare('SELECT COUNT(*) as count FROM police_stations').all()[0];
-  if (stationCount.count === 0) {
+  if (stationCount.count < 4) { // Wipe and re-seed if less than our new set
+    database.exec('DELETE FROM police_stations');
     seedPoliceStations(database);
   }
 
@@ -101,14 +102,11 @@ function initializeDatabase() {
 
 function seedPoliceStations(database) {
   const stations = [
-    { name: 'Central Police Station', address: '1 MG Road, City Center', contact: '100', latitude: 19.0760, longitude: 72.8777 },
-    { name: 'North District Station', address: '45 North Ave, Andheri', contact: '022-26831000', latitude: 19.1136, longitude: 72.8697 },
-    { name: 'South District Station', address: '12 Marine Lines, Colaba', contact: '022-22634000', latitude: 18.9322, longitude: 72.8264 },
-    { name: 'East Division Station', address: '78 Eastern Express Hwy, Kurla', contact: '022-25013000', latitude: 19.0728, longitude: 72.8826 },
-    { name: 'West Precinct Station', address: '33 Linking Road, Bandra', contact: '022-26402000', latitude: 19.0596, longitude: 72.8295 },
-    { name: 'Airport Zone Station', address: '5 Airport Road, Sahar', contact: '022-26820000', latitude: 19.0968, longitude: 72.8742 },
-    { name: 'Harbour Station', address: '22 Dock Yard Rd, Mazgaon', contact: '022-23760000', latitude: 18.9622, longitude: 72.8463 },
-    { name: 'Suburban Station', address: '99 Station Road, Borivali', contact: '022-28901000', latitude: 19.2307, longitude: 72.8567 }
+    { name: 'T. Nagar Police Station (R-1)', address: '45/2, Thanikachalam Rd, T. Nagar, Chennai', contact: '044-23452581', latitude: 13.0418, longitude: 80.2341 },
+    { name: 'Adyar Police Station (J-2)', address: 'LB Rd, Adyar, Chennai', contact: '044-23452586', latitude: 13.0067, longitude: 80.2578 },
+    { name: 'Anna Nagar Police Station (K-4)', address: '2nd Ave, Anna Nagar, Chennai', contact: '044-23452602', latitude: 13.0850, longitude: 80.2101 },
+    { name: 'Marina Police Station (D-5)', address: 'Kamarajar Salai, Marina Beach, Chennai', contact: '044-23452571', latitude: 13.0500, longitude: 80.2824 },
+    { name: 'Nungambakkam Police Station (F-3)', address: 'Valluvar Kottam High Rd, Nungambakkam, Chennai', contact: '044-23452588', latitude: 13.0597, longitude: 80.2444 }
   ];
 
   const insert = database.prepare(

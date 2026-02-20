@@ -81,7 +81,7 @@ const updateComplaintStatus = async (req, res) => {
 };
 
 // PUT /api/admin/complaints/:id/assign
-const assignComplaint = (req, res) => {
+const assignComplaint = async (req, res) => {
     try {
         const { station_id } = req.body;
         if (!station_id) return res.status(400).json({ success: false, message: 'station_id is required.' });
@@ -97,7 +97,16 @@ const assignComplaint = (req, res) => {
         db.prepare('INSERT INTO complaint_history (complaint_id, changed_by, old_status, new_status, remarks) VALUES (?, ?, ?, ?, ?)')
             .run(complaint.id, req.user.id, complaint.status, complaint.status, `Assigned to ${station.name}`);
 
-        res.json({ success: true, message: `Complaint assigned to ${station.name}`, station });
+        // Regenerate PDF with assigned station
+        const updatedComplaint = db.prepare('SELECT * FROM complaints WHERE id = ?').all(complaint.id)[0];
+        const citizen = db.prepare('SELECT name, email FROM users WHERE id = ?').all(complaint.citizen_id)[0];
+        // Station is already fetched above (line 93)
+
+        deleteOldPDF(complaint.pdf_file);
+        const { filename } = await generateComplaintPDF(updatedComplaint, citizen, station);
+        db.prepare('UPDATE complaints SET pdf_file = ? WHERE id = ?').run(filename, complaint.id);
+
+        res.json({ success: true, message: `Complaint assigned to ${station.name}`, station, complaint: updatedComplaint });
     } catch (err) {
         console.error('Assign error:', err);
         res.status(500).json({ success: false, message: 'Server error.' });
