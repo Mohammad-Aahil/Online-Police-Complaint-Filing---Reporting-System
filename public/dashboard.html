@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Citizen Dashboard - Police Complaint Portal</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+
+    <!-- NAVBAR -->
+    <nav class="navbar">
+        <a class="navbar-brand" href="index.html">
+            <span class="logo-icon">🚔</span>
+            <div>
+                <div class="brand-text">Police Complaint Portal</div>
+                <div class="brand-sub">Citizen Dashboard</div>
+            </div>
+        </a>
+        <div class="navbar-nav">
+            <span class="user-badge" id="userBadge">👤 Loading...</span>
+            <a href="file-complaint.html" class="nav-link btn-nav">+ New Complaint</a>
+            <a href="#" class="nav-link" id="logoutBtn">🚪 Logout</a>
+        </div>
+    </nav>
+
+    <div class="dashboard-layout">
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="sidebar-label">Menu</div>
+            <a class="sidebar-link active" onclick="showSection('complaints')">
+                <span class="icon">📋</span> My Complaints
+            </a>
+            <a class="sidebar-link" onclick="showSection('stations')">
+                <span class="icon">📍</span> Find Stations
+            </a>
+            <a class="sidebar-link" href="file-complaint.html">
+                <span class="icon">📝</span> File Complaint
+            </a>
+            <div class="divider" style="margin:0.5rem 0;border-color:rgba(255,255,255,0.1);"></div>
+            <div class="sidebar-label">Account</div>
+            <a class="sidebar-link" onclick="logout()">
+                <span class="icon">🚪</span> Logout
+            </a>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="main-content">
+
+            <!-- Stats row -->
+            <div class="grid-4 mb-3" id="statsRow">
+                <div class="stat-card total">
+                    <div class="stat-icon total">📋</div>
+                    <div>
+                        <div class="stat-value" id="totalC">0</div>
+                        <div class="stat-label">Total</div>
+                    </div>
+                </div>
+                <div class="stat-card pending">
+                    <div class="stat-icon pending">⏳</div>
+                    <div>
+                        <div class="stat-value" id="pendingC">0</div>
+                        <div class="stat-label">Pending</div>
+                    </div>
+                </div>
+                <div class="stat-card progress">
+                    <div class="stat-icon progress">🔍</div>
+                    <div>
+                        <div class="stat-value" id="progressC">0</div>
+                        <div class="stat-label">In Progress</div>
+                    </div>
+                </div>
+                <div class="stat-card resolved">
+                    <div class="stat-icon resolved">✅</div>
+                    <div>
+                        <div class="stat-value" id="resolvedC">0</div>
+                        <div class="stat-label">Resolved</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- COMPLAINTS SECTION -->
+            <div id="section-complaints">
+                <div class="d-flex justify-between align-center mb-2">
+                    <h2 style="font-size:1.4rem;font-weight:700;">My Complaints</h2>
+                    <a href="file-complaint.html" class="btn btn-accent">+ File New Complaint</a>
+                </div>
+
+                <!-- Filter bar -->
+                <div class="filter-bar">
+                    <select id="filterStatus" onchange="loadComplaints()">
+                        <option value="">All Statuses</option>
+                        <option value="Pending">Pending</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Resolved">Resolved</option>
+                    </select>
+                    <span style="color:var(--text-muted);font-size:0.88rem;" id="complaintCount"></span>
+                </div>
+
+                <div id="complaintsList">
+                    <div class="loading-state">
+                        <div class="spinner"></div>
+                        <p>Loading complaints...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STATIONS SECTION -->
+            <div id="section-stations" class="hidden">
+                <div class="d-flex justify-between align-center mb-2">
+                    <h2 style="font-size:1.4rem;font-weight:700;">📍 Find Nearby Stations</h2>
+                </div>
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <p style="color:var(--text-muted);margin-bottom:1rem;">Click the button to use your GPS location
+                            and find the 5 nearest police stations.</p>
+                        <button class="btn btn-primary" id="gpsBtn" onclick="findNearbyStations()">📡 Use My GPS
+                            Location</button>
+                        <div id="gpsStatus" class="mt-2"></div>
+                    </div>
+                </div>
+                <div id="stationsList"></div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- COMPLAINT DETAIL MODAL -->
+    <div class="modal-overlay hidden" id="detailModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>📋 Complaint Details</h3>
+                <button class="modal-close" onclick="closeModal('detailModal')">✕</button>
+            </div>
+            <div class="modal-body" id="detailModalBody"></div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="downloadBtn" onclick="downloadPDF()">⬇ Download PDF</button>
+                <button class="btn btn-outline" style="color:var(--text);border-color:var(--border);"
+                    onclick="closeModal('detailModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = '/api';
+        let currentComplaintId = null;
+        let currentPage = 1;
+
+        function getToken() { return localStorage.getItem('token'); }
+        function getUser() { return JSON.parse(localStorage.getItem('user') || 'null'); }
+
+        function authHeader() { return { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' }; }
+
+        // Guard
+        const user = getUser();
+        const token = getToken();
+        if (!token || !user || user.role !== 'citizen') {
+            window.location.href = 'login.html';
+        }
+        document.getElementById('userBadge').textContent = '👤 ' + user.name;
+        document.getElementById('logoutBtn').onclick = logout;
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = 'login.html';
+        }
+
+        function showSection(name) {
+            document.querySelectorAll('[id^="section-"]').forEach(s => s.classList.add('hidden'));
+            document.getElementById('section-' + name).classList.remove('hidden');
+            document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+        }
+
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        function getStatusClass(status) {
+            return status === 'Pending' ? 'pending' : status === 'In Progress' ? 'in-progress' : 'resolved';
+        }
+        function getBadgeClass(status) {
+            return status === 'Pending' ? 'badge-pending' : status === 'In Progress' ? 'badge-progress' : 'badge-resolved';
+        }
+
+        async function loadComplaints() {
+            const status = document.getElementById('filterStatus').value;
+            const url = `${API}/complaints?status=${status}&page=${currentPage}&limit=10`;
+
+            document.getElementById('complaintsList').innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Loading...</p></div>';
+
+            try {
+                const res = await fetch(url, { headers: authHeader() });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.message);
+
+                const { complaints, pagination } = data;
+                document.getElementById('complaintCount').textContent = `${pagination.total} complaint(s) found`;
+
+                // Update stats
+                loadStats();
+
+                if (complaints.length === 0) {
+                    document.getElementById('complaintsList').innerHTML = `
+        <div class="empty-state">
+          <span class="empty-icon">📭</span>
+          <h3>No complaints found</h3>
+          <p>You haven't filed any complaints yet.</p>
+          <a href="file-complaint.html" class="btn btn-accent mt-2">+ File Your First Complaint</a>
+        </div>`;
+                    return;
+                }
+
+                let html = '';
+                complaints.forEach(c => {
+                    html += `
+        <div class="complaint-card ${getStatusClass(c.status)}">
+          <div style="flex:1;min-width:0;">
+            <div class="complaint-ref">${c.reference_number}</div>
+            <div class="complaint-category">${c.category}</div>
+            <div class="complaint-desc">${c.description}</div>
+            <div class="complaint-meta">
+              <span>📅 ${new Date(c.created_at).toLocaleDateString('en-IN')}</span>
+              <span>📍 ${c.address_text}</span>
+              ${c.station_name ? '<span>🏢 ' + c.station_name + '</span>' : ''}
+            </div>
+          </div>
+          <div class="complaint-actions">
+            <span class="badge ${getBadgeClass(c.status)}">${c.status}</span>
+            <button class="btn btn-primary btn-sm" onclick="viewComplaint(${c.id})">👁 View</button>
+            ${c.status === 'Pending' ? `<button class="btn btn-sm" style="background:var(--warning);color:white;" onclick="window.location.href='file-complaint.html?edit=${c.id}'">✏ Edit</button>` : ''}
+            ${c.pdf_file ? `<button class="btn btn-success btn-sm" onclick="downloadComplaintPDF(${c.id})">⬇ PDF</button>` : ''}
+          </div>
+        </div>`;
+                });
+
+                // Pagination
+                if (pagination.pages > 1) {
+                    html += '<div class="pagination">';
+                    for (let i = 1; i <= pagination.pages; i++) {
+                        html += `<button class="page-btn ${i === currentPage ? 'active' : ''}" onclick="changePage(${i})">${i}</button>`;
+                    }
+                    html += '</div>';
+                }
+
+                document.getElementById('complaintsList').innerHTML = html;
+            } catch (err) {
+                document.getElementById('complaintsList').innerHTML = `<div class="alert alert-danger">❌ ${err.message}</div>`;
+            }
+        }
+
+        async function loadStats() {
+            try {
+                const res = await fetch(`${API}/complaints?limit=1000`, { headers: authHeader() });
+                const data = await res.json();
+                if (!data.success) return;
+                const all = data.complaints;
+                // Get all complaints for stats
+                const all2 = await fetch(`${API}/complaints?limit=1000`, { headers: authHeader() }).then(r => r.json());
+                const c = all2.complaints || [];
+                document.getElementById('totalC').textContent = data.pagination.total;
+                document.getElementById('pendingC').textContent = c.filter(x => x.status === 'Pending').length;
+                document.getElementById('progressC').textContent = c.filter(x => x.status === 'In Progress').length;
+                document.getElementById('resolvedC').textContent = c.filter(x => x.status === 'Resolved').length;
+            } catch (e) { }
+        }
+
+        function changePage(p) { currentPage = p; loadComplaints(); }
+
+        async function viewComplaint(id) {
+            currentComplaintId = id;
+            document.getElementById('detailModalBody').innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+            document.getElementById('detailModal').classList.remove('hidden');
+
+            try {
+                const res = await fetch(`${API}/complaints/${id}`, { headers: authHeader() });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.message);
+                const c = data.complaint;
+                const history = data.history || [];
+
+                document.getElementById('detailModalBody').innerHTML = `
+      <div style="margin-bottom:1rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+          <span class="badge ${getBadgeClass(c.status)}" style="font-size:0.9rem;padding:0.4rem 1rem;">${c.status}</span>
+          <span style="color:var(--text-muted);font-size:0.82rem;">Ref: ${c.reference_number}</span>
+        </div>
+        <table style="width:100%;font-size:0.88rem;border-collapse:collapse;">
+          ${[
+                        ['Category', c.category],
+                        ['Address', c.address_text],
+                        ['Filed On', new Date(c.created_at).toLocaleString('en-IN')],
+                        ['Station', c.station_name || 'Not assigned'],
+                        ['Station Contact', c.station_contact || 'N/A'],
+                        ['Evidence', c.evidence_file ? '📎 Uploaded' : 'None'],
+                    ].map(([k, v]) => `<tr><td style="padding:0.5rem;color:var(--text-muted);width:35%;font-weight:600;">${k}</td><td style="padding:0.5rem;">${v}</td></tr>`).join('')}
+        </table>
+        <div style="margin-top:1rem;"><strong>Description:</strong><p style="background:var(--bg);padding:0.75rem;border-radius:var(--radius-sm);margin-top:0.5rem;font-size:0.88rem;">${c.description}</p></div>
+      </div>
+      ${history.length > 0 ? `<div><strong>History:</strong><div class="timeline mt-1">${history.map(h => `<div class="timeline-item"><div class="timeline-date">${new Date(h.created_at).toLocaleString('en-IN')}</div><div class="timeline-content"><strong>${h.changed_by_name}</strong><p>${h.remarks || (h.old_status ? h.old_status + ' → ' + h.new_status : 'Update')}</p></div></div>`).join('')}</div></div>` : ''}
+    `;
+            } catch (err) {
+                document.getElementById('detailModalBody').innerHTML = `<div class="alert alert-danger">❌ ${err.message}</div>`;
+            }
+        }
+
+        function downloadPDF() { if (currentComplaintId) downloadComplaintPDF(currentComplaintId); }
+
+        function downloadComplaintPDF(id) {
+            const link = document.createElement('a');
+            link.href = `${API}/complaints/${id}/download`;
+            link.target = '_blank';
+            // Need auth header - open with token in query or direct
+            fetch(`${API}/complaints/${id}/download`, { headers: { 'Authorization': 'Bearer ' + getToken() } })
+                .then(res => res.blob())
+                .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    link.href = url;
+                    link.download = `complaint-${id}.pdf`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                });
+        }
+
+        async function findNearbyStations() {
+            const btn = document.getElementById('gpsBtn');
+            const status = document.getElementById('gpsStatus');
+            btn.disabled = true;
+            btn.textContent = '📡 Getting location...';
+            status.innerHTML = '<div class="alert alert-info">⏳ Requesting GPS access...</div>';
+
+            if (!navigator.geolocation) {
+                status.innerHTML = '<div class="alert alert-danger">❌ GPS not supported by your browser.</div>';
+                btn.disabled = false; btn.textContent = '📡 Use My GPS Location';
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                const { latitude, longitude } = pos.coords;
+                status.innerHTML = `<div class="alert alert-success">✅ Location found: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}</div>`;
+                try {
+                    const res = await fetch(`${API}/stations/nearby`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ latitude, longitude, limit: 5 })
+                    });
+                    const data = await res.json();
+                    if (!data.success) throw new Error(data.message);
+
+                    let html = '<div class="grid-2">';
+                    data.stations.forEach((s, i) => {
+                        html += `<div class="station-card">
+          <span class="station-distance">📍 ${s.distance} km away</span>
+          <h3 style="font-weight:700;margin-bottom:0.25rem;">${s.name}</h3>
+          <p style="font-size:0.85rem;color:var(--text-muted);">📌 ${s.address}</p>
+          <p style="font-size:0.85rem;color:var(--text-muted);">📞 ${s.contact || 'N/A'}</p>
+        </div>`;
+                    });
+                    html += '</div>';
+                    document.getElementById('stationsList').innerHTML = html;
+                } catch (err) {
+                    status.innerHTML += `<div class="alert alert-danger">❌ ${err.message}</div>`;
+                }
+                btn.disabled = false; btn.textContent = '📡 Refresh Location';
+            }, (err) => {
+                status.innerHTML = `<div class="alert alert-danger">❌ Location denied: ${err.message}</div>`;
+                btn.disabled = false; btn.textContent = '📡 Use My GPS Location';
+            });
+        }
+
+        // Init
+        loadComplaints();
+    </script>
+</body>
+
+</html>

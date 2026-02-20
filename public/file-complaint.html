@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>File Complaint - Police Complaint Portal</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+
+    <nav class="navbar">
+        <a class="navbar-brand" href="dashboard.html">
+            <span class="logo-icon">🚔</span>
+            <div>
+                <div class="brand-text">Police Complaint Portal</div>
+                <div class="brand-sub">File a Complaint</div>
+            </div>
+        </a>
+        <div class="navbar-nav">
+            <a href="dashboard.html" class="nav-link">← My Dashboard</a>
+            <a href="#" class="nav-link" id="logoutBtn">🚪 Logout</a>
+        </div>
+    </nav>
+
+    <div class="page-header">
+        <div class="container">
+            <h1 id="pageTitle">📝 File New Complaint</h1>
+            <p id="pageSubtitle">Provide accurate details. All fields marked * are required.</p>
+        </div>
+    </div>
+
+    <section class="section">
+        <div class="container" style="max-width:780px;">
+
+            <div id="alertBox"></div>
+
+            <div class="card">
+                <div class="card-header">📝 Complaint Information</div>
+                <div class="card-body">
+                    <form id="complaintForm" enctype="multipart/form-data">
+
+                        <div class="grid-2">
+                            <div class="form-group">
+                                <label class="form-label">Category *</label>
+                                <select id="category" class="form-control" required>
+                                    <option value="">-- Select Category --</option>
+                                    <option>Theft</option>
+                                    <option>Robbery</option>
+                                    <option>Assault</option>
+                                    <option>Cybercrime</option>
+                                    <option>Fraud / Cheating</option>
+                                    <option>Missing Person</option>
+                                    <option>Eve Teasing / Harassment</option>
+                                    <option>Domestic Violence</option>
+                                    <option>Drug Abuse</option>
+                                    <option>Traffic Violation</option>
+                                    <option>Property Dispute</option>
+                                    <option>Noise Complaint</option>
+                                    <option>Other</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Incident Address *</label>
+                                <input id="address_text" type="text" class="form-control"
+                                    placeholder="Where did the incident occur?" required />
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Description *</label>
+                            <textarea id="description" class="form-control" rows="5"
+                                placeholder="Describe the incident in detail — what happened, when, who was involved, etc."
+                                required></textarea>
+                        </div>
+
+                        <!-- GPS Location -->
+                        <div class="card mb-2" style="border:2px dashed var(--border);box-shadow:none;">
+                            <div class="card-body" style="padding:1rem;">
+                                <div class="d-flex align-center justify-between">
+                                    <div>
+                                        <strong>📍 GPS Location</strong>
+                                        <p style="font-size:0.82rem;color:var(--text-muted);margin-top:0.25rem;">
+                                            Auto-detect your location or enter manually</p>
+                                    </div>
+                                    <button type="button" class="btn btn-primary btn-sm" id="gpsBtn"
+                                        onclick="getGPS()">📡 Auto-detect</button>
+                                </div>
+                                <div class="grid-2 mt-2">
+                                    <div class="form-group" style="margin:0;">
+                                        <label class="form-label">Latitude</label>
+                                        <input id="latitude" type="number" step="any" class="form-control"
+                                            placeholder="e.g. 19.0760" />
+                                    </div>
+                                    <div class="form-group" style="margin:0;">
+                                        <label class="form-label">Longitude</label>
+                                        <input id="longitude" type="number" step="any" class="form-control"
+                                            placeholder="e.g. 72.8777" />
+                                    </div>
+                                </div>
+                                <div id="gpsResult" class="mt-1"></div>
+                            </div>
+                        </div>
+
+                        <!-- Evidence upload -->
+                        <div class="form-group">
+                            <label class="form-label">Evidence File (optional)</label>
+                            <div class="form-file" onclick="document.getElementById('evidence').click()">
+                                <input id="evidence" type="file" accept="image/*,video/*,.pdf,.doc,.docx"
+                                    style="display:none;" onchange="updateFileLabel(this)" />
+                                <span id="fileLabel">📎 Click to upload image, video, PDF or document (max 10MB)</span>
+                            </div>
+                        </div>
+
+                        <!-- Nearby station auto-assign -->
+                        <div class="form-group" id="stationGroup">
+                            <label class="form-label">Assign to Police Station (optional)</label>
+                            <select id="stationSelect" class="form-control">
+                                <option value="">-- Select a station or load nearby --</option>
+                            </select>
+                            <p style="font-size:0.78rem;color:var(--text-muted);margin-top:0.3rem;">💡 Enable GPS above
+                                to auto-load nearest stations first.</p>
+                        </div>
+
+                        <button type="submit" class="btn btn-accent btn-block btn-lg" id="submitBtn">
+                            🚀 Submit Complaint
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        const API = '/api';
+        const token = localStorage.getItem('token');
+        const user = JSON.parse(localStorage.getItem('user') || 'null');
+        if (!token || !user || user.role !== 'citizen') window.location.href = 'login.html';
+        document.getElementById('logoutBtn').onclick = () => {
+            localStorage.clear(); window.location.href = 'login.html';
+        };
+
+        function showAlert(msg, type = 'danger') {
+            document.getElementById('alertBox').innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+            window.scrollTo(0, 0);
+        }
+        function updateFileLabel(input) {
+            document.getElementById('fileLabel').textContent = input.files[0] ? '✅ ' + input.files[0].name : '📎 Click to upload...';
+        }
+
+        // Check if editing
+        const urlParams = new URLSearchParams(window.location.search);
+        const editId = urlParams.get('edit');
+        let existingComplaint = null;
+
+        async function loadAllStations() {
+            try {
+                const res = await fetch(`${API}/stations`);
+                const data = await res.json();
+                if (data.success) {
+                    const sel = document.getElementById('stationSelect');
+                    data.stations.forEach(s => {
+                        const opt = document.createElement('option');
+                        opt.value = s.id;
+                        opt.textContent = s.name + ' — ' + s.address;
+                        sel.appendChild(opt);
+                    });
+                }
+            } catch (e) { }
+        }
+
+        async function loadEditData(id) {
+            try {
+                const res = await fetch(`${API}/complaints/${id}`, { headers: { 'Authorization': 'Bearer ' + token } });
+                const data = await res.json();
+                if (!data.success) { showAlert('❌ ' + data.message); return; }
+                existingComplaint = data.complaint;
+                document.getElementById('pageTitle').textContent = '✏️ Edit Complaint';
+                document.getElementById('pageSubtitle').textContent = `Editing: ${existingComplaint.reference_number} (Status: ${existingComplaint.status})`;
+                document.getElementById('category').value = existingComplaint.category;
+                document.getElementById('description').value = existingComplaint.description;
+                document.getElementById('address_text').value = existingComplaint.address_text;
+                document.getElementById('latitude').value = existingComplaint.latitude || '';
+                document.getElementById('longitude').value = existingComplaint.longitude || '';
+                if (existingComplaint.assigned_station_id) {
+                    document.getElementById('stationSelect').value = existingComplaint.assigned_station_id;
+                }
+                document.getElementById('submitBtn').textContent = '💾 Update Complaint';
+            } catch (e) { showAlert('❌ Failed to load complaint.'); }
+        }
+
+        function getGPS() {
+            const btn = document.getElementById('gpsBtn');
+            btn.textContent = '⏳ Loading...'; btn.disabled = true;
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                const { latitude, longitude } = pos.coords;
+                document.getElementById('latitude').value = latitude.toFixed(6);
+                document.getElementById('longitude').value = longitude.toFixed(6);
+                document.getElementById('gpsResult').innerHTML = `<div class="alert alert-success">✅ Location captured: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}</div>`;
+
+                // Load nearby stations
+                try {
+                    const res = await fetch(`${API}/stations/nearby`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ latitude, longitude, limit: 5 })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        const sel = document.getElementById('stationSelect');
+                        sel.innerHTML = '<option value="">-- Nearby Stations (sorted by distance) --</option>';
+                        data.stations.forEach(s => {
+                            const opt = document.createElement('option');
+                            opt.value = s.id;
+                            opt.textContent = `${s.name} — ${s.distance}km — ${s.address}`;
+                            sel.appendChild(opt);
+                        });
+                        if (data.stations.length > 0) sel.value = data.stations[0].id; // auto-select nearest
+                    }
+                } catch (e) { }
+
+                btn.textContent = '✅ Location Set'; btn.disabled = false;
+            }, (err) => {
+                document.getElementById('gpsResult').innerHTML = `<div class="alert alert-danger">❌ ${err.message}</div>`;
+                btn.textContent = '📡 Auto-detect'; btn.disabled = false;
+            });
+        }
+
+        document.getElementById('complaintForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('submitBtn');
+            btn.textContent = '⏳ Submitting...'; btn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('category', document.getElementById('category').value);
+            formData.append('description', document.getElementById('description').value);
+            formData.append('address_text', document.getElementById('address_text').value);
+            const lat = document.getElementById('latitude').value;
+            const lng = document.getElementById('longitude').value;
+            if (lat) formData.append('latitude', lat);
+            if (lng) formData.append('longitude', lng);
+            const evidenceFile = document.getElementById('evidence').files[0];
+            if (evidenceFile) formData.append('evidence', evidenceFile);
+
+            const method = editId ? 'PUT' : 'POST';
+            const url = editId ? `${API}/complaints/${editId}` : `${API}/complaints`;
+
+            try {
+                const res = await fetch(url, {
+                    method,
+                    headers: { 'Authorization': 'Bearer ' + token },
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success) {
+                    // Assign station if selected
+                    const stationId = document.getElementById('stationSelect').value;
+                    if (stationId && !editId) {
+                        await fetch(`/api/admin/complaints/${data.complaint.id}/assign`, {
+                            method: 'PUT',
+                            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ station_id: parseInt(stationId) })
+                        }).catch(() => { });
+                    }
+                    showAlert(`✅ Complaint ${editId ? 'updated' : 'filed'} successfully! Reference: ${data.complaint.reference_number}`, 'success');
+                    setTimeout(() => window.location.href = 'dashboard.html', 2000);
+                } else {
+                    showAlert('❌ ' + data.message);
+                    btn.textContent = editId ? '💾 Update Complaint' : '🚀 Submit Complaint';
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                showAlert('❌ Server error. Please try again.');
+                btn.textContent = editId ? '💾 Update Complaint' : '🚀 Submit Complaint';
+                btn.disabled = false;
+            }
+        });
+
+        // Init
+        loadAllStations();
+        if (editId) loadEditData(editId);
+    </script>
+</body>
+
+</html>
