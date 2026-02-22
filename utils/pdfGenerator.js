@@ -110,9 +110,13 @@ function generateComplaintPDF(complaint, citizen, station) {
 
 function deleteOldPDF(filename) {
     if (filename) {
-        const filepath = path.join(reportsDir, filename);
-        if (fs.existsSync(filepath)) {
-            fs.unlinkSync(filepath);
+        try {
+            const filepath = path.join(reportsDir, filename);
+            if (fs.existsSync(filepath)) {
+                fs.unlinkSync(filepath);
+            }
+        } catch (err) {
+            console.error('Error deleting old PDF:', err);
         }
     }
 }

@@ -62,18 +62,25 @@ const updateComplaintStatus = async (req, res) => {
         db.prepare('INSERT INTO complaint_history (complaint_id, changed_by, old_status, new_status, remarks) VALUES (?, ?, ?, ?, ?)')
             .run(complaint.id, req.user.id, oldStatus, status, remarks || `Status updated by admin`);
 
-        // Regenerate PDF with new status
-        const updatedComplaint = db.prepare('SELECT * FROM complaints WHERE id = ?').all(complaint.id)[0];
-        const citizen = db.prepare('SELECT name, email FROM users WHERE id = ?').all(complaint.citizen_id)[0];
-        const station = updatedComplaint.assigned_station_id
-            ? db.prepare('SELECT * FROM police_stations WHERE id = ?').all(updatedComplaint.assigned_station_id)[0]
-            : null;
+        // Regenerate PDF with new status (Background Task)
+        setImmediate(async () => {
+            try {
+                const updatedComplaint = db.prepare('SELECT * FROM complaints WHERE id = ?').get(complaint.id);
+                const citizen = db.prepare('SELECT name, email FROM users WHERE id = ?').get(complaint.citizen_id);
+                const station = updatedComplaint.assigned_station_id
+                    ? db.prepare('SELECT * FROM police_stations WHERE id = ?').get(updatedComplaint.assigned_station_id)
+                    : null;
 
-        deleteOldPDF(complaint.pdf_file);
-        const { filename } = await generateComplaintPDF(updatedComplaint, citizen, station);
-        db.prepare('UPDATE complaints SET pdf_file = ? WHERE id = ?').run(filename, complaint.id);
+                deleteOldPDF(complaint.pdf_file);
+                const { filename } = await generateComplaintPDF(updatedComplaint, citizen, station);
+                db.prepare('UPDATE complaints SET pdf_file = ? WHERE id = ?').run(filename, complaint.id);
+                console.log(`✅ PDF Regenerated (Status) for Complaint: ${complaint.id}`);
+            } catch (pdfErr) {
+                console.error('❌ Background PDF Regenerate Error (Status):', pdfErr);
+            }
+        });
 
-        res.json({ success: true, message: `Complaint status updated to ${status}`, complaint: db.prepare('SELECT * FROM complaints WHERE id = ?').all(complaint.id)[0] });
+        res.json({ success: true, message: `Complaint status updated to ${status}`, complaint: db.prepare('SELECT * FROM complaints WHERE id = ?').get(complaint.id) });
     } catch (err) {
         console.error('Update status error:', err);
         res.status(500).json({ success: false, message: 'Server error.' });
@@ -83,30 +90,48 @@ const updateComplaintStatus = async (req, res) => {
 // PUT /api/admin/complaints/:id/assign
 const assignComplaint = async (req, res) => {
     try {
-        const { station_id } = req.body;
-        if (!station_id) return res.status(400).json({ success: false, message: 'station_id is required.' });
+        const complaintId = parseInt(req.params.id);
+        const stationId = parseInt(req.body.station_id);
+
+        if (isNaN(complaintId) || isNaN(stationId)) {
+            return res.status(400).json({ success: false, message: 'Invalid ID format. Both complaint ID and station ID must be numbers.' });
+        }
+
+        if (!stationId) return res.status(400).json({ success: false, message: 'station_id is required.' });
 
         const db = getDb();
-        const complaint = db.prepare('SELECT * FROM complaints WHERE id = ? AND is_deleted = 0').all(req.params.id)[0];
+        const complaint = db.prepare('SELECT * FROM complaints WHERE id = ? AND is_deleted = 0').get(complaintId);
         if (!complaint) return res.status(404).json({ success: false, message: 'Complaint not found.' });
 
-        const station = db.prepare('SELECT * FROM police_stations WHERE id = ?').all(station_id)[0];
+        const station = db.prepare('SELECT * FROM police_stations WHERE id = ?').get(stationId);
         if (!station) return res.status(404).json({ success: false, message: 'Station not found.' });
 
-        db.prepare('UPDATE complaints SET assigned_station_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(station_id, complaint.id);
+        db.prepare('UPDATE complaints SET assigned_station_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(stationId, complaintId);
         db.prepare('INSERT INTO complaint_history (complaint_id, changed_by, old_status, new_status, remarks) VALUES (?, ?, ?, ?, ?)')
-            .run(complaint.id, req.user.id, complaint.status, complaint.status, `Assigned to ${station.name}`);
+            .run(complaintId, req.user.id, complaint.status, complaint.status, `Assigned to ${station.name}`);
 
-        // Regenerate PDF with assigned station
-        const updatedComplaint = db.prepare('SELECT * FROM complaints WHERE id = ?').all(complaint.id)[0];
-        const citizen = db.prepare('SELECT name, email FROM users WHERE id = ?').all(complaint.citizen_id)[0];
-        // Station is already fetched above (line 93)
+        // Regenerate PDF with assigned station (Background Task)
+        setImmediate(async () => {
+            try {
+                const updatedComplaint = db.prepare('SELECT * FROM complaints WHERE id = ?').get(complaintId);
+                const citizen = db.prepare('SELECT name, email FROM users WHERE id = ?').get(complaint.citizen_id);
 
-        deleteOldPDF(complaint.pdf_file);
-        const { filename } = await generateComplaintPDF(updatedComplaint, citizen, station);
-        db.prepare('UPDATE complaints SET pdf_file = ? WHERE id = ?').run(filename, complaint.id);
+                deleteOldPDF(complaint.pdf_file);
+                const { filename } = await generateComplaintPDF(updatedComplaint, citizen, station);
+                db.prepare('UPDATE complaints SET pdf_file = ? WHERE id = ?').run(filename, complaintId);
+                console.log(`✅ PDF Regenerated for Complaint: ${complaintId}`);
+            } catch (pdfErr) {
+                console.error('❌ Background PDF Regenerate Error:', pdfErr);
+            }
+        });
 
-        res.json({ success: true, message: `Complaint assigned to ${station.name}`, station, complaint: updatedComplaint });
+        console.log(`📡 Sending success response for assignment to station: ${stationId}`);
+        res.json({
+            success: true,
+            message: `Complaint assigned to ${station.name}`,
+            station,
+            complaint: db.prepare('SELECT * FROM complaints WHERE id = ?').get(complaintId)
+        });
     } catch (err) {
         console.error('Assign error:', err);
         res.status(500).json({ success: false, message: 'Server error.' });
