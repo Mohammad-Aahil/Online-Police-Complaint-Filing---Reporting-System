@@ -16,34 +16,55 @@ function generateRefNumber() {
 // POST /api/complaints — File a new complaint
 const fileComplaint = async (req, res) => {
     try {
-        const { category, description, address_text, latitude, longitude } = req.body;
+        const { category, description, address_text, latitude, longitude, station_id } = req.body;
 
-        if (!category || !description || !address_text) {
-            return res.status(400).json({ success: false, message: 'Category, description, and address are required.' });
+        if (!category || !description || !address_text || !station_id) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Category, description, address, and police station are required.' 
+            });
         }
 
         const db = getDb();
+        
+        // Validate station exists
+        const station = db.prepare('SELECT * FROM police_stations WHERE id = ?').get(station_id);
+        if (!station) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Selected police station is not valid.' 
+            });
+        }
+
         const reference_number = generateRefNumber();
         const evidence_file = req.file ? req.file.filename : null;
         const citizen_id = req.user.id;
 
-        // Insert complaint (no PDF yet)
+        // Insert complaint with mandatory station assignment
         const result = db.prepare(`
-      INSERT INTO complaints (reference_number, citizen_id, category, description, address_text, latitude, longitude, evidence_file)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(reference_number, citizen_id, category, description, address_text, latitude || null, longitude || null, evidence_file);
+      INSERT INTO complaints (
+        reference_number, citizen_id, category, description, address_text, 
+        latitude, longitude, evidence_file, assigned_station_id,
+        userAssignedStationId, finalAssignedStationId, assignmentStatus
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'User Assigned')
+    `).run(
+            reference_number, citizen_id, category, description, address_text, 
+            latitude || null, longitude || null, evidence_file, station_id,
+            station_id, station_id
+        );
 
         const complaintId = result.lastInsertRowid;
         const complaint = db.prepare('SELECT * FROM complaints WHERE id = ?').all(complaintId)[0];
         const citizen = db.prepare('SELECT name, email FROM users WHERE id = ?').all(citizen_id)[0];
 
         // Generate PDF
-        const { filename } = await generateComplaintPDF(complaint, citizen, null);
+        const { filename } = await generateComplaintPDF(complaint, citizen, station);
         db.prepare('UPDATE complaints SET pdf_file = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(filename, complaintId);
 
         // Log history
         db.prepare(`INSERT INTO complaint_history (complaint_id, changed_by, old_status, new_status, remarks) VALUES (?, ?, ?, ?, ?)`)
-            .run(complaintId, citizen_id, null, 'Pending', 'Complaint filed');
+            .run(complaintId, citizen_id, null, 'Pending', `Complaint filed and assigned to ${station.name}`);
 
         const finalComplaint = db.prepare('SELECT * FROM complaints WHERE id = ?').all(complaintId)[0];
 

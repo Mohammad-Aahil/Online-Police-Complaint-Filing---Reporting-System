@@ -253,6 +253,33 @@
         </div>
     </div>
 
+    <!-- REASSIGN STATION MODAL -->
+    <div class="modal-overlay hidden" id="reassignModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>🔄 Reassign Police Station</h3>
+                <button class="modal-close" onclick="closeModal('reassignModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="reassignStationForm">
+                    <input type="hidden" id="reassignComplaintId">
+                    <div class="form-group">
+                        <label class="form-label">Current Assignment</label>
+                        <div id="currentAssignment" style="padding: 0.75rem; background: var(--bg-light); border-radius: var(--radius); margin-bottom: 1rem;"></div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Reassign to Station</label>
+                        <select id="reassignStationSelect" class="form-control" required>
+                            <option value="">-- Choose a Station --</option>
+                        </select>
+                    </div>
+                    <div id="reassignAlert"></div>
+                    <button type="submit" class="btn btn-warning btn-block" id="saveReassignBtn">🔄 Reassign Station</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- DETAIL MODAL (Enhanced for Admin) -->
     <div class="modal-overlay hidden" id="detailModal">
         <div class="modal" style="max-width:700px;">
@@ -263,9 +290,10 @@
             <div class="modal-body" id="detailModalBody"></div>
             <div class="modal-footer">
                 <button class="btn btn-primary" id="assignBtnInModal">🏢 Assign Station</button>
+                <button class="btn btn-warning" id="reassignBtnInModal">🔄 Reassign Station</button>
                 <button class="btn btn-accent" id="updateBtnInModal">📝 Update Status</button>
                 <button class="btn btn-secondary" id="downloadBtn" onclick="downloadPDF()">⬇ PDF</button>
-                <button class="btn btn-outline" style="color:var(--text);border-color:var(--border);"
+                <button class="btn btn-outline" style="color:var(--text);border-color:var(--border);" 
                     onclick="closeModal('detailModal')">Close</button>
             </div>
         </div>
@@ -477,6 +505,11 @@
                     openAssignModal(c.id, c.assigned_station_id);
                 }
 
+                document.getElementById('reassignBtnInModal').onclick = () => {
+                    closeModal('detailModal');
+                    openReassignModal(c.id, c.user_station_name, c.final_station_name, c.finalAssignedStationId);
+                }
+
                 document.getElementById('detailModalBody').innerHTML = `
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem;">
                         <div>
@@ -651,6 +684,68 @@
             } finally {
                 btn.disabled = false;
                 btn.textContent = '✅ Confirm Assignment';
+            }
+        });
+
+        async function openReassignModal(id, userStation, finalStation, currentStationId) {
+            document.getElementById('reassignComplaintId').value = id;
+            document.getElementById('currentAssignment').innerHTML = `
+                <div><strong>User Selected:</strong> ${userStation || 'Not specified'}</div>
+                <div><strong>Currently Assigned:</strong> ${finalStation || 'Not assigned'}</div>
+            `;
+            document.getElementById('reassignAlert').innerHTML = '';
+            document.getElementById('reassignModal').classList.remove('hidden');
+
+            try {
+                const res = await fetch(`${API}/stations`, { headers: authHeader() });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.message);
+
+                let options = '<option value="">-- Choose a Station --</option>';
+                data.stations.forEach(s => {
+                    if (s.id != currentStationId) { // Exclude current station
+                        options += `<option value="${s.id}">${s.name}</option>`;
+                    }
+                });
+                document.getElementById('reassignStationSelect').innerHTML = options;
+            } catch (err) {
+                document.getElementById('reassignAlert').innerHTML = `<div class="alert alert-danger">❌ ${err.message}</div>`;
+            }
+        }
+
+        document.getElementById('reassignStationForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('reassignComplaintId').value;
+            const station_id = document.getElementById('reassignStationSelect').value;
+            const btn = document.getElementById('saveReassignBtn');
+
+            if (!station_id) return;
+            btn.disabled = true;
+            btn.textContent = '⏳ Reassigning...';
+
+            try {
+                const res = await fetch(`${API}/admin/complaints/${id}/reassign`, {
+                    method: 'PUT',
+                    headers: authHeader(),
+                    body: JSON.stringify({ station_id })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    document.getElementById('reassignAlert').innerHTML = '<div class="alert alert-success">✅ Reassigned successfully!</div>';
+                    setTimeout(() => {
+                        closeModal('reassignModal');
+                        loadAllComplaints();
+                        loadAnalytics();
+                    }, 1000);
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (err) {
+                document.getElementById('reassignAlert').innerHTML = `<div class="alert alert-danger">❌ ${err.message}</div>`;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔄 Reassign Station';
             }
         });
 

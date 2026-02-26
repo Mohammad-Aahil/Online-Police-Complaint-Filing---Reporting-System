@@ -113,14 +113,13 @@
                             </div>
                         </div>
 
-                        <!-- Nearby station auto-assign -->
+                        <!-- Police Station Selection -->
                         <div class="form-group" id="stationGroup">
-                            <label class="form-label">Assign to Police Station (optional)</label>
-                            <select id="stationSelect" class="form-control">
-                                <option value="">-- Select a station or load nearby --</option>
+                            <label class="form-label">Select Police Station *</label>
+                            <select id="stationSelect" class="form-control" required>
+                                <option value="">-- Choose a Police Station --</option>
                             </select>
-                            <p style="font-size:0.78rem;color:var(--text-muted);margin-top:0.3rem;">💡 Enable GPS above
-                                to auto-load nearest stations first.</p>
+                            <p style="font-size:0.78rem;color:var(--text-muted);margin-top:0.3rem;">� Select the police station jurisdiction where the incident occurred</p>
                         </div>
 
                         <button type="submit" class="btn btn-accent btn-block btn-lg" id="submitBtn">
@@ -235,6 +234,14 @@
             formData.append('category', document.getElementById('category').value);
             formData.append('description', document.getElementById('description').value);
             formData.append('address_text', document.getElementById('address_text').value);
+            const stationId = document.getElementById('stationSelect').value;
+            if (!stationId) {
+                showAlert('Please select a police station');
+                btn.textContent = editId ? '💾 Update Complaint' : '🚀 Submit Complaint';
+                btn.disabled = false;
+                return;
+            }
+            formData.append('station_id', stationId);
             const lat = document.getElementById('latitude').value;
             const lng = document.getElementById('longitude').value;
             if (lat) formData.append('latitude', lat);

@@ -12,10 +12,13 @@ const getAllComplaints = (req, res) => {
 
         let query = `
       SELECT c.*, u.name as citizen_name, u.email as citizen_email,
-             ps.name as station_name
+             us.name as user_station_name, us.address as user_station_address,
+             fs.name as final_station_name, fs.address as final_station_address,
+             c.assignmentStatus, c.assignedAt
       FROM complaints c
       JOIN users u ON c.citizen_id = u.id
-      LEFT JOIN police_stations ps ON c.assigned_station_id = ps.id
+      LEFT JOIN police_stations us ON c.userAssignedStationId = us.id
+      LEFT JOIN police_stations fs ON c.finalAssignedStationId = fs.id
       WHERE c.is_deleted = 0
     `;
         const params = [];
@@ -185,9 +188,12 @@ const getComplaint = (req, res) => {
         const db = getDb();
         const complaint = db.prepare(`
       SELECT c.*, u.name as citizen_name, u.email as citizen_email,
-             ps.name as station_name, ps.address as station_address, ps.contact as station_contact
+             us.name as user_station_name, us.address as user_station_address, us.contact as user_station_contact,
+             fs.name as final_station_name, fs.address as final_station_address, fs.contact as final_station_contact,
+             c.assignmentStatus, c.assignedAt
       FROM complaints c JOIN users u ON c.citizen_id = u.id
-      LEFT JOIN police_stations ps ON c.assigned_station_id = ps.id
+      LEFT JOIN police_stations us ON c.userAssignedStationId = us.id
+      LEFT JOIN police_stations fs ON c.finalAssignedStationId = fs.id
       WHERE c.id = ? AND c.is_deleted = 0
     `).all(req.params.id)[0];
         if (!complaint) return res.status(404).json({ success: false, message: 'Complaint not found.' });
@@ -203,4 +209,112 @@ const getComplaint = (req, res) => {
     }
 };
 
-module.exports = { getAllComplaints, updateComplaintStatus, assignComplaint, downloadComplaint, getAnalytics, getComplaint };
+// PUT /api/admin/complaints/:id/reassign
+const reassignComplaint = async (req, res) => {
+    try {
+        const complaintId = parseInt(req.params.id);
+        const stationId = parseInt(req.body.station_id);
+
+        if (isNaN(complaintId) || isNaN(stationId)) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Invalid ID format. Both complaint ID and station ID must be numbers.' 
+            });
+        }
+
+        if (!stationId) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'station_id is required.' 
+            });
+        }
+
+        const db = getDb();
+        const complaint = db.prepare(`
+            SELECT c.*, us.name as user_station_name, fs.name as final_station_name 
+            FROM complaints c 
+            LEFT JOIN police_stations us ON c.userAssignedStationId = us.id
+            LEFT JOIN police_stations fs ON c.finalAssignedStationId = fs.id
+            WHERE c.id = ? AND c.is_deleted = 0
+        `).get(complaintId);
+
+        if (!complaint) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Complaint not found.' 
+            });
+        }
+
+        const newStation = db.prepare('SELECT * FROM police_stations WHERE id = ?').get(stationId);
+        if (!newStation) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Station not found.' 
+            });
+        }
+
+        // Check if reassigning to same station
+        if (complaint.finalAssignedStationId === stationId) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Complaint is already assigned to this station.' 
+            });
+        }
+
+        const oldStationName = complaint.final_station_name || 'Unknown';
+        
+        // Update assignment
+        db.prepare(`
+            UPDATE complaints 
+            SET finalAssignedStationId = ?, assignmentStatus = 'Admin Overridden', 
+                assignedAt = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
+            WHERE id = ?
+        `).run(stationId, complaintId);
+
+        // Log assignment change in history
+        db.prepare(`
+            INSERT INTO complaint_history (complaint_id, changed_by, old_status, new_status, remarks) 
+            VALUES (?, ?, ?, ?, ?)
+        `).run(
+            complaintId, 
+            req.user.id, 
+            complaint.status, 
+            complaint.status, 
+            `Admin reassigned from ${oldStationName} to ${newStation.name}`
+        );
+
+        // Regenerate PDF with new station (Background Task)
+        setImmediate(async () => {
+            try {
+                const updatedComplaint = db.prepare('SELECT * FROM complaints WHERE id = ?').get(complaintId);
+                const citizen = db.prepare('SELECT name, email FROM users WHERE id = ?').get(complaint.citizen_id);
+
+                deleteOldPDF(complaint.pdf_file);
+                const { filename } = await generateComplaintPDF(updatedComplaint, citizen, newStation);
+                db.prepare('UPDATE complaints SET pdf_file = ? WHERE id = ?').run(filename, complaintId);
+                console.log(`✅ PDF Regenerated after reassignment for Complaint: ${complaintId}`);
+            } catch (pdfErr) {
+                console.error('❌ Background PDF Regenerate Error (Reassignment):', pdfErr);
+            }
+        });
+
+        res.json({
+            success: true,
+            message: `Complaint reassigned from ${oldStationName} to ${newStation.name}`,
+            oldStation: oldStationName,
+            newStation: newStation.name,
+            complaint: db.prepare(`
+                SELECT c.*, us.name as user_station_name, fs.name as final_station_name 
+                FROM complaints c 
+                LEFT JOIN police_stations us ON c.userAssignedStationId = us.id
+                LEFT JOIN police_stations fs ON c.finalAssignedStationId = fs.id
+                WHERE c.id = ?
+            `).get(complaintId)
+        });
+    } catch (err) {
+        console.error('Reassign error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+module.exports = { getAllComplaints, updateComplaintStatus, assignComplaint, reassignComplaint, downloadComplaint, getAnalytics, getComplaint };
