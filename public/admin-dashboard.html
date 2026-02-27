@@ -7,71 +7,104 @@
     <title>Admin Dashboard - Police Complaint Portal</title>
     <link rel="stylesheet" href="styles.css" />
     <style>
-        /* Specific Fix for the reported bug: Remarks/Descriptions going out of box */
-        .complaint-desc,
-        .remarks-text,
-        .modal-body p {
-            overflow-wrap: break-word;
-            word-wrap: break-word;
-            word-break: break-word;
-            hyphens: auto;
-            white-space: pre-wrap;
+        /* ONLY add mobile menu styles - nothing else */
+        
+        /* Hide mobile menu by default */
+        .mobile-menu-toggle {
+            display: none;
         }
 
-        .admin-table-container {
-            background: white;
-            border-radius: var(--radius);
-            box-shadow: var(--shadow);
-            overflow: hidden;
-            margin-top: 1rem;
+        /* Mobile menu styles - ONLY for very small screens */
+        @media (max-width: 480px) {
+            .mobile-menu-toggle {
+                display: block;
+                position: fixed;
+                top: 4.5rem;
+                left: 1rem;
+                z-index: 1001;
+                background: var(--primary);
+                color: white;
+                border: none;
+                padding: 0.5rem 1rem;
+                border-radius: var(--radius-sm);
+                cursor: pointer;
+                font-size: 0.9rem;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            }
+
+            .sidebar {
+                transform: translateX(-100%);
+                position: fixed;
+                z-index: 1000;
+                transition: transform 0.3s ease;
+                top: 0;
+                left: 0;
+                height: 100vh;
+                width: 280px;
+                background: var(--primary);
+                box-shadow: 2px 0 8px rgba(0,0,0,0.3);
+            }
+
+            .sidebar.active {
+                transform: translateX(0);
+            }
+
+            .sidebar.active::before {
+                content: '';
+                position: fixed;
+                top: 0;
+                left: 280px;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.5);
+                z-index: -1;
+                backdrop-filter: blur(2px);
+            }
+
+            .main-content {
+                margin-left: 0;
+                padding-top: 4rem;
+            }
+
+            .navbar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                z-index: 999;
+                background: white;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+
+            .dashboard-layout {
+                flex-direction: column;
+                padding-top: 4rem;
+            }
         }
 
-        .admin-table {
-            width: 100%;
-            border-collapse: collapse;
+        /* Table responsiveness for all screens */
+        @media (max-width: 1200px) {
+            .admin-table-container {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            .admin-table {
+                min-width: 1000px;
+            }
         }
 
-        .admin-table th {
-            text-align: left;
-            padding: 1rem;
-            background: var(--primary);
-            color: white;
-            font-size: 0.85rem;
-            font-weight: 600;
-        }
-
-        .admin-table td {
-            padding: 1rem;
-            border-bottom: 1px solid var(--border);
-            font-size: 0.9rem;
-        }
-
-        .admin-table tr:hover {
-            background: rgba(0, 0, 0, 0.02);
-        }
-
-        .status-select {
-            padding: 0.4rem;
-            border-radius: var(--radius-sm);
-            border: 1px solid var(--border);
-            font-size: 0.8rem;
-        }
-
-        .search-area {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-            flex-wrap: wrap;
-        }
-
-        .search-input {
-            flex: 1;
-            min-width: 250px;
+        @media (max-width: 480px) {
+            .admin-table {
+                min-width: 800px;
+            }
         }
     </style>
 </head>
 
 <body>
+
+    <!-- Mobile Menu Toggle -->
+    <button class="mobile-menu-toggle" id="mobileMenuToggle">☰ Menu</button>
 
     <!-- NAVBAR -->
     <nav class="navbar">
@@ -538,8 +571,13 @@
                     </div>
 
                     <div class="mb-2">
-                        <h4 class="mb-1" style="color:var(--primary);">Assigned Station</h4>
-                        <p>🏢 ${c.station_name || 'Unassigned'}</p>
+                        <h4 class="mb-1" style="color:var(--primary);">Station Assignment</h4>
+                        <div style="background:var(--bg-light);padding:1rem;border-radius:var(--radius-sm);">
+                            <p><strong>User Selected:</strong> 🏢 ${c.user_station_name || 'Not specified'}</p>
+                            <p><strong>Currently Assigned:</strong> 🏢 ${c.final_station_name || 'Not assigned'}</p>
+                            <p><strong>Assignment Status:</strong> <span class="badge ${c.assignmentStatus === 'User Assigned' ? 'badge-pending' : 'badge-warning'}">${c.assignmentStatus || 'User Assigned'}</span></p>
+                            ${c.assignedAt ? `<p><strong>Assigned At:</strong> ${new Date(c.assignedAt).toLocaleString()}</p>` : ''}
+                        </div>
                     </div>
 
                     <div class="divider"></div>
@@ -769,6 +807,55 @@
         window.addEventListener('load', () => {
             console.log('🚀 Dashboard Initializing...');
             loadAnalytics();
+        });
+
+        // Mobile menu toggle
+        document.getElementById('mobileMenuToggle').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const sidebar = document.querySelector('.sidebar');
+            const isActive = sidebar.classList.contains('active');
+            
+            if (isActive) {
+                sidebar.classList.remove('active');
+                document.body.style.overflow = '';
+            } else {
+                sidebar.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
+        });
+
+        // Close mobile menu when clicking overlay
+        document.addEventListener('click', (e) => {
+            const sidebar = document.querySelector('.sidebar');
+            const menuToggle = document.getElementById('mobileMenuToggle');
+            
+            if (window.innerWidth <= 768 && 
+                sidebar.classList.contains('active') &&
+                !sidebar.contains(e.target) && 
+                !menuToggle.contains(e.target)) {
+                sidebar.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        });
+
+        // Close mobile menu when selecting a menu item
+        document.querySelectorAll('.sidebar-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                if (window.innerWidth <= 768) {
+                    const sidebar = document.querySelector('.sidebar');
+                    sidebar.classList.remove('active');
+                    document.body.style.overflow = '';
+                }
+            });
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            const sidebar = document.querySelector('.sidebar');
+            if (window.innerWidth > 768) {
+                sidebar.classList.remove('active');
+                document.body.style.overflow = '';
+            }
         });
     </script>
 </body>

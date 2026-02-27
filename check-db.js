@@ -35,3 +35,4 @@ try {
   console.error('Database check error:', error);
   process.exit(1);
 }
+
