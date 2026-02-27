@@ -140,7 +140,7 @@ function runMigrations(database) {
     }
     if (!hasAssignedAt) {
       console.log('➕ Adding assignedAt column...');
-      database.exec('ALTER TABLE complaints ADD COLUMN assignedAt DATETIME DEFAULT CURRENT_TIMESTAMP');
+      database.exec('ALTER TABLE complaints ADD COLUMN assignedAt DATETIME DEFAULT NULL');
       console.log('✅ assignedAt column added');
     }
 
@@ -164,6 +164,7 @@ function runMigrations(database) {
     console.log('✅ Database migrations completed');
   } catch (error) {
     console.log('ℹ️ Migration info: Columns may already exist');
+    console.error('❌ Migration error details:', error.message);
   }
 }
 
