@@ -113,29 +113,47 @@ function initializeDatabase() {
 function runMigrations(database) {
   // Check if new columns exist, add them if they don't
   try {
+    console.log('🔄 Running database migrations...');
+    
     // Add new assignment columns if they don't exist
     const tableInfo = database.prepare("PRAGMA table_info(complaints)").all();
+    console.log('📋 Current columns:', tableInfo.map(col => col.name));
+    
     const hasUserAssigned = tableInfo.some(col => col.name === 'userAssignedStationId');
     const hasFinalAssigned = tableInfo.some(col => col.name === 'finalAssignedStationId');
     const hasAssignmentStatus = tableInfo.some(col => col.name === 'assignmentStatus');
     const hasAssignedAt = tableInfo.some(col => col.name === 'assignedAt');
 
+    console.log('🔍 Column check - userAssignedStationId:', hasUserAssigned);
+    console.log('🔍 Column check - finalAssignedStationId:', hasFinalAssigned);
+    console.log('🔍 Column check - assignmentStatus:', hasAssignmentStatus);
+    console.log('🔍 Column check - assignedAt:', hasAssignedAt);
+
     if (!hasUserAssigned) {
-      database.exec('ALTER TABLE complaints ADD COLUMN userAssignedStationId INTEGER NOT NULL DEFAULT 1');
+      database.exec('ALTER TABLE complaints ADD COLUMN userAssignedStationId INTEGER');
     }
     if (!hasFinalAssigned) {
-      database.exec('ALTER TABLE complaints ADD COLUMN finalAssignedStationId INTEGER NOT NULL DEFAULT 1');
+      database.exec('ALTER TABLE complaints ADD COLUMN finalAssignedStationId INTEGER');
     }
     if (!hasAssignmentStatus) {
       database.exec("ALTER TABLE complaints ADD COLUMN assignmentStatus TEXT NOT NULL DEFAULT 'User Assigned' CHECK(assignmentStatus IN ('User Assigned', 'Admin Overridden'))");
     }
     if (!hasAssignedAt) {
+      console.log('➕ Adding assignedAt column...');
       database.exec('ALTER TABLE complaints ADD COLUMN assignedAt DATETIME DEFAULT CURRENT_TIMESTAMP');
+      console.log('✅ assignedAt column added');
     }
 
     // Migrate existing complaints
-    const existingComplaints = database.prepare('SELECT id, assigned_station_id FROM complaints WHERE userAssignedStationId = 1 AND assigned_station_id IS NOT NULL').all();
-    existingComplaints.forEach(complaint => {
+    // Check for complaints that need migration (have old assigned_station_id but missing new columns)
+    const complaintsNeedingMigration = database.prepare(`
+      SELECT id, assigned_station_id 
+      FROM complaints 
+      WHERE assigned_station_id IS NOT NULL 
+      AND (userAssignedStationId IS NULL OR finalAssignedStationId IS NULL)
+    `).all();
+    
+    complaintsNeedingMigration.forEach(complaint => {
       database.prepare(`
         UPDATE complaints 
         SET userAssignedStationId = ?, finalAssignedStationId = ?, assignmentStatus = 'User Assigned'

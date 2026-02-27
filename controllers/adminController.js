@@ -12,8 +12,8 @@ const getAllComplaints = (req, res) => {
 
         let query = `
       SELECT c.*, u.name as citizen_name, u.email as citizen_email,
-             us.name as user_station_name, us.address as user_station_address,
-             fs.name as final_station_name, fs.address as final_station_address,
+             COALESCE(us.name, 'Not assigned') as user_station_name, COALESCE(us.address, '') as user_station_address,
+             COALESCE(fs.name, 'Not assigned') as final_station_name, COALESCE(fs.address, '') as final_station_address,
              c.assignmentStatus, c.assignedAt
       FROM complaints c
       JOIN users u ON c.citizen_id = u.id
@@ -188,9 +188,9 @@ const getComplaint = (req, res) => {
         const db = getDb();
         const complaint = db.prepare(`
       SELECT c.*, u.name as citizen_name, u.email as citizen_email,
-             us.name as user_station_name, us.address as user_station_address, us.contact as user_station_contact,
-             fs.name as final_station_name, fs.address as final_station_address, fs.contact as final_station_contact,
-             c.assignmentStatus, c.assignedAt
+             COALESCE(us.name, 'Not assigned') as user_station_name, COALESCE(us.address, '') as user_station_address, COALESCE(us.contact, '') as user_station_contact,
+             COALESCE(fs.name, 'Not assigned') as final_station_name, COALESCE(fs.address, '') as final_station_address, COALESCE(fs.contact, '') as final_station_contact,
+             COALESCE(c.assignmentStatus, 'User Assigned') as assignmentStatus, c.assignedAt
       FROM complaints c JOIN users u ON c.citizen_id = u.id
       LEFT JOIN police_stations us ON c.userAssignedStationId = us.id
       LEFT JOIN police_stations fs ON c.finalAssignedStationId = fs.id
